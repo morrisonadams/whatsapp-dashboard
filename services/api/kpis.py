@@ -48,9 +48,19 @@ def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> D
                     tags[e] = set()
                 tags[e].add("emoji")
         cnt = Counter(words)
+
+        # start with overall top N
+        top_words = {w for w, _ in cnt.most_common(top_n)}
+        # ensure we also include top N for each tag category
+        all_tags = {t for ts in tags.values() for t in ts}
+        for t in all_tags:
+            tagged = [w for w in cnt if t in tags.get(w, set())]
+            top_words.update(
+                [w for w, _ in Counter({w: cnt[w] for w in tagged}).most_common(top_n)]
+            )
         out[str(sender)] = [
-            {"name": w, "value": int(c), "tags": sorted(list(tags.get(w, set())))}
-            for w, c in cnt.most_common(top_n)
+            {"name": w, "value": int(cnt[w]), "tags": sorted(list(tags.get(w, set())))}
+            for w in sorted(top_words, key=lambda x: cnt[x], reverse=True)
         ]
     return out
 

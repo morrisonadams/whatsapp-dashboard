@@ -295,9 +295,10 @@ export default function Home() {
 
   const wordCloudOption = (person: string) => {
     const raw = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number; tags?:string[]}>;
-    const data = wordFilters.length
+    const data = (wordFilters.length
       ? raw.filter(r => (r.tags || []).some(t => wordFilters.includes(t)))
-      : raw;
+      : raw)
+      .slice(0, 50);
     return {
       backgroundColor: "transparent",
       tooltip: {},
