@@ -309,13 +309,13 @@ async function fetchConflicts() {
   };
 
   const conflictBarOption = () => {
-    const periods = conflicts.map(p=>p.period);
+    const months = conflicts.map(p=>p.month);
     const totals = conflicts.map(p=>p.total_conflicts);
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: periods, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      xAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[3] }, barWidth: "40%" }]
     };
@@ -452,10 +452,10 @@ async function fetchConflicts() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card title="Conflicts per period (2 weeks)">
+              <Card title="Conflicts per month">
                 {conflictProgress && (
                   <div className="text-sm text-gray-400 mb-2">
-                    Analyzing {conflictProgress.current}/{conflictProgress.total} periods...
+                    Analyzing {conflictProgress.current}/{conflictProgress.total} segments...
                   </div>
                 )}
                 <Chart option={conflictBarOption()} />
@@ -471,8 +471,8 @@ async function fetchConflicts() {
               <Card title="Conflict details">
                 {!conflictProgress && conflicts.length === 0 && <div className="text-sm text-gray-400">No conflict data.</div>}
                 {conflicts.map(p => (
-                  <div key={p.period} className="mb-4">
-                    <div className="font-semibold mb-1">{p.period} — {p.total_conflicts}</div>
+                  <div key={p.month} className="mb-4">
+                    <div className="font-semibold mb-1">{p.month} — {p.total_conflicts}</div>
                     <ul className="text-sm text-gray-300 list-disc ml-5">
                       {p.conflicts.map((c:any,i:number)=>(
                         <li key={i}><span className="font-mono">{c.date}</span>: {c.summary}</li>

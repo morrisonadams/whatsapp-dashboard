@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 from parse import parse_export
 from kpis import to_df, compute
-from conflict import analyze_conflicts, stream_conflicts
+from conflict import analyze_conflicts, stream_conflicts, periods_to_months
 import json
 from dotenv import load_dotenv
 
@@ -32,14 +32,14 @@ class KPIResponse(BaseModel):
     kpis: Dict[str, Any]
 
 
-class ConflictPeriod(BaseModel):
-    period: str
+class ConflictMonth(BaseModel):
+    month: str
     total_conflicts: int
     conflicts: List[Dict[str, str]]
 
 
 class ConflictResponse(BaseModel):
-    periods: List[ConflictPeriod]
+    months: List[ConflictMonth]
 
 @app.post("/upload", response_model=KPIResponse)
 async def upload(file: UploadFile = File(...)):
@@ -76,9 +76,10 @@ async def get_conflicts():
         raise HTTPException(status_code=404, detail="No upload yet")
     try:
         periods = await analyze_conflicts(STATE["messages_df"])
+        months = periods_to_months(periods)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
-    return {"periods": periods}
+    return {"months": months}
 
 @app.get("/version")
 def version():

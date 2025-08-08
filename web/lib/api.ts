@@ -22,11 +22,27 @@ export async function getConflicts(
   return new Promise<any[]>((resolve, reject) => {
     const es = new EventSource(`${API_BASE}/conflicts_stream`);
     const periods: any[] = [];
+
+    const aggregate = (per: any[]) => {
+      const months: Record<string, {month: string; total_conflicts: number; conflicts: any[]}> = {};
+      for (const p of per) {
+        const start = new Date(p.period.split("/")[0]);
+        const monthKey = start.toISOString().slice(0,7);
+        if (!months[monthKey]) {
+          months[monthKey] = {month: monthKey, total_conflicts: 0, conflicts: []};
+        }
+        for (const c of (p.conflicts || [])) {
+          months[monthKey].conflicts.push(c);
+          months[monthKey].total_conflicts += 1;
+        }
+      }
+      return Object.values(months).sort((a,b)=>a.month.localeCompare(b.month));
+    };
+
     es.onmessage = (ev) => {
       if (ev.data === "[DONE]") {
         es.close();
-        const sorted = periods.sort((a, b) => a.period.localeCompare(b.period));
-        resolve(sorted);
+        resolve(aggregate(periods));
         return;
       }
       try {

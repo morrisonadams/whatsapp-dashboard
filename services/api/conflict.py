@@ -29,6 +29,7 @@ def _build_prompt(period: str, df: pd.DataFrame) -> str:
         "Return only legitimate, emotionally significant conflicts. Ignore brattiness, playful criticisms, "
         "and ongoing teasing unless they escalate into real misunderstandings, new boundaries, or feelings of hurt. "
         "Focus solely on disagreements between the two people in this conversation; disregard conflicts involving third parties unless they create tension between them.\n"
+        "If there are no significant conflicts in this period, respond with total_conflicts: 0 and an empty conflicts array.\n"
         "Output JSON with:\n"
         "total_conflicts: integer, count of significant or potentially relationship-altering conflicts.\n"
         "conflicts: an array of objects, each with:\n"
@@ -83,6 +84,22 @@ async def analyze_conflicts(
     ]
     results = await asyncio.gather(*tasks)
     return sorted(results, key=lambda x: x["period"])
+
+
+def periods_to_months(periods: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Aggregate two-week period results into calendar months."""
+    months: Dict[str, Dict[str, Any]] = {}
+    for p in periods:
+        start = pd.Period(p["period"], freq="2W").start_time
+        month_key = f"{start:%Y-%m}"
+        month_entry = months.setdefault(
+            month_key, {"month": month_key, "total_conflicts": 0, "conflicts": []}
+        )
+        for c in p.get("conflicts", []):
+            month_entry["conflicts"].append(c)
+            month_entry["total_conflicts"] += 1
+    # Ensure months are returned in chronological order
+    return [months[m] for m in sorted(months)]
 
 
 async def stream_conflicts(
