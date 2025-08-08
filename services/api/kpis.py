@@ -119,15 +119,11 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "words": int(by_sender_df["words"].sum()) if len(by_sender_df)>0 else 0
     }
 
-    # Reply stats (general next-other-sender, fallback to adjacent)
-    rp = reply_pairs_general(d)
-    if rp.empty:
-        rp_adj = reply_pairs(d)
-        if not rp_adj.empty:
-            rp = rp_adj.rename(columns={"to":"responder"})
+    # Reply stats (adjacent messages by different senders)
+    rp = reply_pairs(d)
     reply_simple = []
     if not rp.empty:
-        for person, arr in rp.groupby("responder")["sec"]:
+        for person, arr in rp.groupby("to")["sec"]:
             arr = arr.clip(lower=0)
             reply_simple.append({
                 "person": str(person),

@@ -21,12 +21,23 @@ export default function Home() {
   const [err, setErr] = useState<string | null>(null);
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
   const [heatPerson, setHeatPerson] = useState<string>("All");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   useEffect(() => {
     fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version").then(r=>r.json()).then(d=>setApiVersion(d.version||"?"));
     // auto-load sample on first visit
     loadSample().then(setKpis).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!kpis) return;
+    const days = (kpis.timeline_messages || []).map((r:any)=>r.day).sort();
+    if (days.length) {
+      setStartDate(days[0]);
+      setEndDate(days[days.length - 1]);
+    }
+  }, [kpis]);
 
   const onUpload = async (file: File) => {
     setBusy(true); setErr(null);
@@ -50,8 +61,36 @@ export default function Home() {
     return map;
   }, [participants]);
 
+  const dateFilter = (day: string) => {
+    if (startDate && day < startDate) return false;
+    if (endDate && day > endDate) return false;
+    return true;
+  };
+
+  const filteredBySender = useMemo(() => {
+    if (!kpis) return [] as Array<any>;
+    if (!startDate && !endDate) return kpis.by_sender || [];
+    const msgMap: Record<string, number> = {};
+    const wordMap: Record<string, number> = {};
+    (kpis.timeline_messages || []).filter((r:any)=>dateFilter(r.day)).forEach((r:any)=>{
+      msgMap[r.sender] = (msgMap[r.sender]||0) + r.messages;
+    });
+    (kpis.timeline_words || []).filter((r:any)=>dateFilter(r.day)).forEach((r:any)=>{
+      wordMap[r.sender] = (wordMap[r.sender]||0) + r.words;
+    });
+    return participants.map(p => ({ sender: p, messages: msgMap[p]||0, words: wordMap[p]||0 }));
+  }, [kpis, startDate, endDate, participants]);
+
+  const filteredTotals = useMemo(() => {
+    if (!kpis) return { messages: 0, words: 0 };
+    if (!startDate && !endDate) return kpis.totals;
+    const totalMessages = (kpis.timeline_messages || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.messages,0);
+    const totalWords = (kpis.timeline_words || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.words,0);
+    return { messages: totalMessages, words: totalWords };
+  }, [kpis, startDate, endDate]);
+
   const messagesOption = () => {
-    const rows = kpis?.by_sender || [];
+    const rows = filteredBySender;
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
@@ -69,7 +108,7 @@ export default function Home() {
   };
 
   const wordsOption = () => {
-    const rows = kpis?.by_sender || [];
+    const rows = filteredBySender;
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
@@ -110,7 +149,7 @@ export default function Home() {
 
   const timelineOption = () => {
     const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
-    const tl = kpis?.[key] || [];
+    const tl = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
     const senders = Array.from(new Set(tl.map((r:any)=>r.sender)));
     const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
     const series = senders.map((s: string, i:number) => ({
@@ -128,6 +167,7 @@ export default function Home() {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: {},
+      dataZoom: [{ type: 'inside' }, { type: 'slider' }],
       legend: { data: senders, textStyle:{color: palette.text} },
       xAxis: { type: "category", data: days, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "value", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
@@ -200,11 +240,29 @@ export default function Home() {
         {!kpis && <div className="text-gray-300">Load sample or upload a WhatsApp export.</div>}
         {kpis && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card title="Messages"><div className="text-2xl font-bold">{kpis.totals.messages}</div></Card>
-              <Card title="Words"><div className="text-2xl font-bold">{kpis.totals.words}</div></Card>
-              <Card title="We-ness ratio"><div className="text-2xl font-bold">{kpis.we_ness_ratio.toFixed(2)}</div></Card>
-              <Card title="Profanity hits"><div className="text-2xl font-bold">{kpis.profanity_hits}</div></Card>
+            <div className="flex flex-col md:flex-row gap-2 md:items-end">
+              <div>
+                <label className="text-sm mr-2">Start</label>
+                <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
+              </div>
+              <div>
+                <label className="text-sm mr-2">End</label>
+                <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+              <Card title="Messages" tooltip="Total messages exchanged in selected date range">
+                <div className="text-2xl font-bold">{filteredTotals.messages}</div>
+              </Card>
+              <Card title="Words" tooltip="Total words sent in selected date range">
+                <div className="text-2xl font-bold">{filteredTotals.words}</div>
+              </Card>
+              <Card title="We-ness ratio" tooltip="Share of 'we/us/our' versus first-person pronouns">
+                <div className="text-2xl font-bold">{kpis.we_ness_ratio.toFixed(2)}</div>
+              </Card>
+              <Card title="Profanity hits" tooltip="Count of messages containing common profanity">
+                <div className="text-2xl font-bold">{kpis.profanity_hits}</div>
+              </Card>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
