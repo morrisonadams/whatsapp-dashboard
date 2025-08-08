@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterator, List, Tuple
 
 import pandas as pd
 from openai import OpenAI
@@ -64,3 +64,18 @@ def analyze_conflicts_by_month(df: pd.DataFrame, model: str = "gpt-5-nano") -> L
     for month, sub in _month_groups(df).items():
         results.append(_analyze_month(month, sub, client, model))
     return results
+
+
+def stream_conflicts(
+    df: pd.DataFrame, model: str = "gpt-5-nano"
+) -> Iterator[Tuple[int, int, Dict[str, Any]]]:
+    """Yield conflict analysis month by month with progress info."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not set")
+    client = OpenAI(api_key=api_key)
+    groups = _month_groups(df)
+    months = sorted(groups.items(), key=lambda x: x[0])
+    total = len(months)
+    for idx, (month, sub) in enumerate(months, start=1):
+        yield idx, total, _analyze_month(month, sub, client, model)

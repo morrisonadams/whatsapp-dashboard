@@ -1,11 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from parse import parse_export
 from kpis import to_df, compute
-from conflict import analyze_conflicts_by_month
-import io
+from conflict import analyze_conflicts_by_month, stream_conflicts
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -79,22 +80,6 @@ def get_conflicts():
         raise HTTPException(status_code=500, detail=str(exc))
     return {"months": months}
 
-# Convenience endpoint to preload sample
-@app.get("/load_sample", response_model=KPIResponse)
-def load_sample():
-    import os
-    base = os.path.dirname(__file__)
-    sample = os.path.join(base, "sample_data", "snippet.txt")
-    with open(sample, "r", encoding="utf-8") as f:
-        text = f.read()
-    msgs = parse_export(text)
-    df = to_df(msgs)
-    k = compute(df)
-    STATE["messages_df"] = df
-    STATE["kpis"] = k
-    return {"kpis": k}
-
-
 @app.get("/version")
 def version():
     return {"version": API_VERSION}
@@ -124,3 +109,17 @@ def kpis_raw():
 @app.get("/health")
 def health():
     return {"ok": True, "version": API_VERSION, "has_kpis": STATE["kpis"] is not None}
+
+
+@app.get("/conflicts_stream")
+def conflicts_stream():
+    if STATE["messages_df"] is None:
+        raise HTTPException(status_code=404, detail="No upload yet")
+
+    def event_gen():
+        for current, total, data in stream_conflicts(STATE["messages_df"]):
+            payload = {"current": current, "total": total, "month": data}
+            yield f"data: {json.dumps(payload)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")

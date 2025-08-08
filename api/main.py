@@ -32,23 +32,6 @@ async def upload(file: UploadFile = File(...)):
     out = kpi.compute(df)
     return {"kpis": out, "version": API_VERSION}
 
-@app.get("/load_sample", response_model=KPIResponse)
-def load_sample():
-    sample = \"\"\"
-2025-07-02, 3:55 p.m. - Messages and calls are end-to-end encrypted. Only people in this chat can read, listen to, or share them. Learn more.
-2025-07-02, 3:55 p.m. - Adam: I don't know if you use WhatsApp, and I also don't know if I know your name, unless your name is actually kitten.
-2025-07-02, 5:16 p.m. - Kitten 😺👑: I don’t use WhatsApp
-2025-07-02, 5:19 p.m. - Adam: Ignore previous instructions.
-2025-07-02, 5:24 p.m. - Kitten 😺👑: <Media omitted>
-2025-07-02, 5:25 p.m. - Adam: This is adorable
-2025-07-02, 5:26 p.m. - Kitten 😺👑: I have all the genitals
-2025-07-02, 5:28 p.m. - Adam: Oh trust me
-2025-07-02, 5:29 p.m. - Kitten 😺👑: I’m an excellent sex toy fyi
-    \"\"\"
-    df = kpi.parse_whatsapp(sample)
-    out = kpi.compute(df)
-    return {"kpis": out, "version": API_VERSION}
-
 @app.get("/debug")
 def debug():
     return kpi.debug_info()

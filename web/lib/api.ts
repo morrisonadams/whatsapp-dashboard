@@ -2,13 +2,7 @@ export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:80
 
 export async function getKPIs() {
   const res = await fetch(`${API_BASE}/kpis`);
-  if (!res.ok) throw new Error("No KPIs yet, load sample or upload");
-  const data = await res.json();
-  return data.kpis;
-}
-
-export async function loadSample() {
-  const res = await fetch(`${API_BASE}/load_sample`);
+  if (!res.ok) throw new Error("No KPIs yet, upload a chat export");
   const data = await res.json();
   return data.kpis;
 }
@@ -22,18 +16,31 @@ export async function uploadFile(file: File) {
   return data.kpis;
 }
 
-export async function getConflicts() {
-  const res = await fetch(`${API_BASE}/conflicts`);
-  if (!res.ok) {
-    let msg = "Failed to fetch conflicts";
-    try {
-      const err = await res.json();
-      msg = err.detail || JSON.stringify(err);
-    } catch {
-      msg = await res.text();
-    }
-    throw new Error(msg);
-  }
-  const data = await res.json();
-  return data.months;
+export async function getConflicts(
+  onProgress?: (current: number, total: number) => void
+) {
+  return new Promise<any[]>((resolve, reject) => {
+    const es = new EventSource(`${API_BASE}/conflicts_stream`);
+    const months: any[] = [];
+    es.onmessage = (ev) => {
+      if (ev.data === "[DONE]") {
+        es.close();
+        resolve(months);
+        return;
+      }
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.current && msg.total && onProgress) {
+          onProgress(msg.current, msg.total);
+        }
+        if (msg.month) months.push(msg.month);
+      } catch {
+        // ignore malformed messages
+      }
+    };
+    es.onerror = () => {
+      es.close();
+      reject(new Error("Failed to stream conflicts"));
+    };
+  });
 }

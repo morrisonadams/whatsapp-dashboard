@@ -1,6 +1,6 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { getKPIs, loadSample, uploadFile, getConflicts } from "@/lib/api";
+import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
 
@@ -22,6 +22,7 @@ export default function Home() {
   const [err, setErr] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [conflictErr, setConflictErr] = useState<string | null>(null);
+  const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
   const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
@@ -30,9 +31,9 @@ export default function Home() {
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
 
   useEffect(() => {
-    fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version").then(r=>r.json()).then(d=>setApiVersion(d.version||"?"));
-    // auto-load sample on first visit
-    loadSample().then(k=>{ setKpis(k); fetchConflicts(); }).catch(() => {});
+    fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version")
+      .then(r=>r.json())
+      .then(d=>setApiVersion(d.version||"?"));
   }, []);
 
   useEffect(() => {
@@ -50,11 +51,13 @@ export default function Home() {
 
 async function fetchConflicts() {
   try {
-    const m = await getConflicts();
+    const m = await getConflicts((current,total)=>setConflictProgress({current,total}));
     setConflicts(m);
     setConflictErr(null);
   } catch (e: any) {
     setConflictErr(e?.message || "Failed to load conflicts");
+  } finally {
+    setConflictProgress(null);
   }
 }
 
@@ -446,18 +449,23 @@ async function fetchConflicts() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card title="Conflicts per month">
+                {conflictProgress && (
+                  <div className="text-sm text-gray-400 mb-2">
+                    Analyzing {conflictProgress.current}/{conflictProgress.total} months...
+                  </div>
+                )}
                 <Chart option={conflictBarOption()} />
-                {conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
+                {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
               </Card>
               <Card title="Conflict timeline">
                 <Chart option={conflictTimelineOption()} height={200} />
-                {conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
+                {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
               </Card>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
               <Card title="Conflict details">
-                {conflicts.length === 0 && <div className="text-sm text-gray-400">No conflict data.</div>}
+                {!conflictProgress && conflicts.length === 0 && <div className="text-sm text-gray-400">No conflict data.</div>}
                 {conflicts.map(m => (
                   <div key={m.month} className="mb-4">
                     <div className="font-semibold mb-1">{m.month} — {m.total_conflicts}</div>
