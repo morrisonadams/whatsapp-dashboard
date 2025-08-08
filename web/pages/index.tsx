@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, loadSample, uploadFile } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
+import 'echarts-wordcloud';
 
 type KPI = any;
 
@@ -60,6 +61,8 @@ export default function Home() {
     });
     return map;
   }, [participants]);
+
+  const wordCloudParticipants = participants.slice(0, 2);
 
   const dateFilter = (day: string) => {
     if (startDate && day < startDate) return false;
@@ -199,6 +202,22 @@ export default function Home() {
     };
   };
 
+  const wordCloudOption = (person: string) => {
+    const data = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number}>;
+    return {
+      backgroundColor: "transparent",
+      tooltip: {},
+      series: [{
+        type: 'wordCloud',
+        gridSize: 8,
+        sizeRange: [12, 50],
+        rotationRange: [0, 0],
+        textStyle: { color: colorMap[person] },
+        data
+      }]
+    };
+  };
+
   const affSplit = (kpis?.affection_split ?? []) as Array<{sender:string; affection:number}>;
   const qSplit = (kpis?.questions_split ?? []) as Array<{sender:string; questions:number; unanswered_15m:number}>;
   const bySender = (kpis?.by_sender ?? []) as Array<{sender:string; media:number}>;
@@ -298,6 +317,23 @@ export default function Home() {
                   ))}
                 </div>
                 <Chart option={heatOption()} height={320} />
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <Card title="Word cloud by participant">
+                {wordCloudParticipants.length === 2 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {wordCloudParticipants.map(p => (
+                      <div key={p}>
+                        <div className="text-center mb-1 font-semibold">{p}</div>
+                        <Chart option={wordCloudOption(p)} height={260} />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-400">Need two participants for word clouds.</div>
+                )}
               </Card>
             </div>
 
