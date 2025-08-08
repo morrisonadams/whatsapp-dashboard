@@ -367,10 +367,7 @@ export default function Home() {
                 <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-              <Card title="Messages" tooltip="Total messages exchanged in selected date range">
-                <div className="text-2xl font-bold">{filteredTotals.messages}</div>
-              </Card>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
               <Card title="Words" tooltip="Total words sent in selected date range">
                 <div className="text-2xl font-bold">{filteredTotals.words}</div>
               </Card>
@@ -383,7 +380,8 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card title="Messages by sender">
+              <Card title="Messages by sender" tooltip="Total messages and distribution by participant">
+                <div className="text-2xl font-bold mb-4">{filteredTotals.messages}</div>
                 <Chart option={messagesOption()} />
               </Card>
               <Card title="Words by sender">
