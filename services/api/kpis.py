@@ -1,6 +1,7 @@
 from typing import List, Dict, Any
 import re, pandas as pd
 from collections import Counter
+from wordcloud import STOPWORDS as WC_STOPWORDS
 from parse import Message
 
 AFFECTION_TOKENS = [
@@ -12,14 +13,18 @@ PRONOUNS_WE = ["we","us","our","ours"]
 PRONOUNS_I = ["i","me","my","mine"]
 QUESTION_PAT = re.compile(r"\?\s*$|^\s*(?:who|what|when|where|why|how|can|do|did|are|is|should)\b", re.IGNORECASE)
 
-STOPWORDS = {
-    "the","a","and","to","of","in","i","you","it","is","for","on","me","my","your","we","our","us",
-    "are","be","at","this","that","was","so","but","with","have","not","do","just","im","its","like"
-}
+# Start with wordcloud's default stopwords and extend with chat-specific ones
+STOPWORDS = set(WC_STOPWORDS)
+STOPWORDS.update({"im", "us", "our", "ours", "your"})
 
 def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> Dict[str, List[Dict[str, int]]]:
     out: Dict[str, List[Dict[str, int]]] = {}
-    for sender, sub in df[df["sender"].isin(participants)].groupby("sender"):
+    filtered = df[
+        df["sender"].isin(participants)
+        & (~df["has_media"])
+        & (~df["text"].str.contains("<media omitted>", case=False, na=False))
+    ]
+    for sender, sub in filtered.groupby("sender"):
         words: List[str] = []
         for text in sub["text"].fillna(""):
             tokens = re.findall(r"[A-Za-z']+", text.lower())
