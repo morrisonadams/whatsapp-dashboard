@@ -1,9 +1,10 @@
+import asyncio
 import json
 import os
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Any, AsyncIterator, Dict, List, Tuple
 
 import pandas as pd
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 
 def _month_groups(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -18,10 +19,10 @@ def _month_groups(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     return groups
 
 
-def _analyze_month(month: str, df: pd.DataFrame, client: OpenAI, model: str) -> Dict[str, Any]:
-    """Send one month's chat to the model and parse conflict info."""
+def _build_prompt(month: str, df: pd.DataFrame) -> str:
+    """Construct the prompt text for a single month."""
     lines = [f"{row['ts']:%Y-%m-%d}: {row['text']}" for _, row in df.iterrows()]
-    prompt = (
+    return (
         "You are an expert assistant in analyzing chat logs for substantive interpersonal conflicts—"
         "moments where one or both people experience real misalignment, emotional pain, disappointment, "
         "or confusion (not just playful teasing). "
@@ -34,12 +35,21 @@ def _analyze_month(month: str, df: pd.DataFrame, client: OpenAI, model: str) -> 
         "summary: a concise, objective description in neutral tone of the disagreement or misalignment, including both perspectives if possible.\n\n"
         f"Chat log for {month}:\n" + "\n".join(lines)
     )
-    resp = client.responses.create(
-        model=model,
-        input=prompt,
-    )
+
+
+async def _analyze_month_async(
+    month: str,
+    df: pd.DataFrame,
+    client: AsyncOpenAI,
+    model: str,
+    sem: asyncio.Semaphore,
+) -> Dict[str, Any]:
+    """Send one month's chat to the model and parse conflict info."""
+    prompt = _build_prompt(month, df)
+    async with sem:
+        resp = await client.responses.create(model=model, input=prompt)
     # The Responses API exposes a convenience property that contains
-    # the concatenated text for the assistant's message.  Using this is
+    # the concatenated text for the assistant's message. Using this is
     # more robust than reaching into the nested `output` structure,
     # which has changed across SDK versions and previously raised
     # attribute errors, resulting in 500s when fetching conflicts.
@@ -54,28 +64,46 @@ def _analyze_month(month: str, df: pd.DataFrame, client: OpenAI, model: str) -> 
     return data
 
 
-def analyze_conflicts_by_month(df: pd.DataFrame, model: str = "gpt-5-nano") -> List[Dict[str, Any]]:
+async def analyze_conflicts_by_month(
+    df: pd.DataFrame,
+    model: str = "gpt-5-nano",
+    max_concurrency: int = 5,
+) -> List[Dict[str, Any]]:
     """Analyze conflicts in chat history month by month using an LLM."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY not set")
-    client = OpenAI(api_key=api_key)
-    results: List[Dict[str, Any]] = []
-    for month, sub in _month_groups(df).items():
-        results.append(_analyze_month(month, sub, client, model))
-    return results
+    client = AsyncOpenAI(api_key=api_key)
+    groups = _month_groups(df)
+    sem = asyncio.Semaphore(max_concurrency)
+    tasks = [
+        _analyze_month_async(month, sub, client, model, sem)
+        for month, sub in groups.items()
+    ]
+    results = await asyncio.gather(*tasks)
+    return sorted(results, key=lambda x: x["month"])
 
 
-def stream_conflicts(
-    df: pd.DataFrame, model: str = "gpt-5-nano"
-) -> Iterator[Tuple[int, int, Dict[str, Any]]]:
+async def stream_conflicts(
+    df: pd.DataFrame,
+    model: str = "gpt-5-nano",
+    max_concurrency: int = 5,
+) -> AsyncIterator[Tuple[int, int, Dict[str, Any]]]:
     """Yield conflict analysis month by month with progress info."""
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY not set")
-    client = OpenAI(api_key=api_key)
+    client = AsyncOpenAI(api_key=api_key)
     groups = _month_groups(df)
-    months = sorted(groups.items(), key=lambda x: x[0])
-    total = len(months)
-    for idx, (month, sub) in enumerate(months, start=1):
-        yield idx, total, _analyze_month(month, sub, client, model)
+    sem = asyncio.Semaphore(max_concurrency)
+    tasks = [
+        asyncio.create_task(_analyze_month_async(month, sub, client, model, sem))
+        for month, sub in groups.items()
+    ]
+    total = len(tasks)
+    completed = 0
+    for fut in asyncio.as_completed(tasks):
+        result = await fut
+        completed += 1
+        yield completed, total, result
+

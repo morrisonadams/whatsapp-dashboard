@@ -25,7 +25,8 @@ export async function getConflicts(
     es.onmessage = (ev) => {
       if (ev.data === "[DONE]") {
         es.close();
-        resolve(months);
+        const sorted = months.sort((a, b) => a.month.localeCompare(b.month));
+        resolve(sorted);
         return;
       }
       try {

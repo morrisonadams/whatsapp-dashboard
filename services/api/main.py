@@ -71,11 +71,11 @@ def get_messages():
 
 
 @app.get("/conflicts", response_model=ConflictResponse)
-def get_conflicts():
+async def get_conflicts():
     if STATE["messages_df"] is None:
         raise HTTPException(status_code=404, detail="No upload yet")
     try:
-        months = analyze_conflicts_by_month(STATE["messages_df"])
+        months = await analyze_conflicts_by_month(STATE["messages_df"])
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"months": months}
@@ -112,12 +112,12 @@ def health():
 
 
 @app.get("/conflicts_stream")
-def conflicts_stream():
+async def conflicts_stream():
     if STATE["messages_df"] is None:
         raise HTTPException(status_code=404, detail="No upload yet")
 
-    def event_gen():
-        for current, total, data in stream_conflicts(STATE["messages_df"]):
+    async def event_gen():
+        async for current, total, data in stream_conflicts(STATE["messages_df"]):
             payload = {"current": current, "total": total, "month": data}
             yield f"data: {json.dumps(payload)}\n\n"
         yield "data: [DONE]\n\n"
