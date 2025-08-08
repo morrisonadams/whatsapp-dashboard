@@ -21,3 +21,10 @@ export async function uploadFile(file: File) {
   const data = await res.json();
   return data.kpis;
 }
+
+export async function getConflicts() {
+  const res = await fetch(`${API_BASE}/conflicts`);
+  if (!res.ok) throw new Error("No conflicts yet, load sample or upload");
+  const data = await res.json();
+  return data.months;
+}

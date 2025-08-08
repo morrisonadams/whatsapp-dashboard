@@ -1,6 +1,6 @@
 
 import { useEffect, useMemo, useState } from "react";
-import { getKPIs, loadSample, uploadFile } from "@/lib/api";
+import { getKPIs, loadSample, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
 
@@ -20,6 +20,8 @@ export default function Home() {
   const [apiVersion, setApiVersion] = useState<string>("?");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [conflicts, setConflicts] = useState<any[]>([]);
+  const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
   const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
@@ -30,7 +32,7 @@ export default function Home() {
   useEffect(() => {
     fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version").then(r=>r.json()).then(d=>setApiVersion(d.version||"?"));
     // auto-load sample on first visit
-    loadSample().then(setKpis).catch(() => {});
+    loadSample().then(k=>{ setKpis(k); fetchConflicts(); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -42,15 +44,26 @@ export default function Home() {
     }
   }, [kpis]);
 
-  useEffect(() => {
+   useEffect(() => {
     setZoomRange(null);
   }, [timelineMetric, startDate, endDate, kpis]);
+
+async function fetchConflicts() {
+  try {
+    const m = await getConflicts();
+    setConflicts(m);
+    setConflictErr(null);
+  } catch (e: any) {
+    setConflictErr(e?.message || "Failed to load conflicts");
+  }
+}
 
   const onUpload = async (file: File) => {
     setBusy(true); setErr(null);
     try {
       const k = await uploadFile(file);
       setKpis(k);
+      await fetchConflicts();
     } catch (e: any) {
       setErr(e?.message || "Upload failed");
     } finally {
@@ -292,6 +305,31 @@ export default function Home() {
     };
   };
 
+  const conflictBarOption = () => {
+    const months = conflicts.map(m=>m.month);
+    const totals = conflicts.map(m=>m.total_conflicts);
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
+      xAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[3] }, barWidth: "40%" }]
+    };
+  };
+
+  const conflictTimelineOption = () => {
+    const pts = conflicts.flatMap(m => (m.conflicts||[]).map((c:any)=>({date:c.date, summary:c.summary})));
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: { formatter: (p:any) => `${p.data.date}: ${p.data.summary}` },
+      xAxis: { type: "time", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { show: false },
+      series: [{ type: "scatter", symbolSize:8, data: pts.map(p=>({ value:[p.date,1], date:p.date, summary:p.summary })), itemStyle:{ color: palette.series[3] } }]
+    };
+  };
+
   const wordCloudOption = (person: string) => {
     const data = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number}>;
     return {
@@ -346,6 +384,7 @@ export default function Home() {
           </label>
         </div>
         {err && <div className="text-red-400">{err}</div>}
+        {conflictErr && <div className="text-red-400">{conflictErr}</div>}
         {!kpis && <div className="text-gray-300">Load sample or upload a WhatsApp export.</div>}
         {kpis && (
           <>
@@ -402,6 +441,33 @@ export default function Home() {
                 </div>
                 <Chart option={timelineOption()} height={280} onEvents={{ dataZoom: handleZoom }} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card title="Conflicts per month">
+                <Chart option={conflictBarOption()} />
+                {conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
+              </Card>
+              <Card title="Conflict timeline">
+                <Chart option={conflictTimelineOption()} height={200} />
+                {conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <Card title="Conflict details">
+                {conflicts.length === 0 && <div className="text-sm text-gray-400">No conflict data.</div>}
+                {conflicts.map(m => (
+                  <div key={m.month} className="mb-4">
+                    <div className="font-semibold mb-1">{m.month} — {m.total_conflicts}</div>
+                    <ul className="text-sm text-gray-300 list-disc ml-5">
+                      {m.conflicts.map((c:any,i:number)=>(
+                        <li key={i}><span className="font-mono">{c.date}</span>: {c.summary}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </Card>
             </div>
 

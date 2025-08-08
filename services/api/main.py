@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 from parse import parse_export
 from kpis import to_df, compute
+from conflict import analyze_conflicts_by_month
 import io
 
 API_VERSION = "0.2.9"
@@ -25,6 +26,16 @@ STATE = {
 
 class KPIResponse(BaseModel):
     kpis: Dict[str, Any]
+
+
+class ConflictMonth(BaseModel):
+    month: str
+    total_conflicts: int
+    conflicts: List[Dict[str, str]]
+
+
+class ConflictResponse(BaseModel):
+    months: List[ConflictMonth]
 
 @app.post("/upload", response_model=KPIResponse)
 async def upload(file: UploadFile = File(...)):
@@ -53,6 +64,17 @@ def get_messages():
         raise HTTPException(status_code=404, detail="No upload yet")
     df = STATE["messages_df"]
     return {"messages": df.to_dict(orient="records")}
+
+
+@app.get("/conflicts", response_model=ConflictResponse)
+def get_conflicts():
+    if STATE["messages_df"] is None:
+        raise HTTPException(status_code=404, detail="No upload yet")
+    try:
+        months = analyze_conflicts_by_month(STATE["messages_df"])
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {"months": months}
 
 # Convenience endpoint to preload sample
 @app.get("/load_sample", response_model=KPIResponse)
