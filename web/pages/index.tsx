@@ -326,7 +326,11 @@ async function fetchConflicts() {
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
-      tooltip: { formatter: (p:any) => `${p.data.date}: ${p.data.summary}` },
+      tooltip: {
+        formatter: (p:any) => `${p.data.date}<br/>${p.data.summary}`,
+        confine: true,
+        extraCssText: 'max-width: 240px; white-space: normal; word-break: break-word;'
+      },
       xAxis: { type: "time", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { show: false },
       series: [{ type: "scatter", symbolSize:8, data: pts.map(p=>({ value:[p.date,1], date:p.date, summary:p.summary })), itemStyle:{ color: palette.series[3] } }]
