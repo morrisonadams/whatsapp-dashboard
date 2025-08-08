@@ -399,7 +399,7 @@ export default function Home() {
                     Trend
                   </label>
                 </div>
-                <Chart option={timelineOption()} height={280} onEvents={{ dataZoom: handleZoom }} />
+                <Chart option={timelineOption()} height={280} onEvents={{ datazoom: handleZoom }} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
               </Card>
             </div>
