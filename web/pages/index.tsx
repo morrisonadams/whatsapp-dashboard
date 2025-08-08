@@ -301,7 +301,10 @@ export default function Home() {
         gridSize: 8,
         sizeRange: [12, 50],
         rotationRange: [0, 0],
-        textStyle: { color: colorMap[person] },
+        textStyle: {
+          color: colorMap[person],
+          fontFamily: "'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji','Android Emoji','EmojiSymbols','EmojiOne','Twemoji','sans-serif'"
+        },
         data
       }]
     };
