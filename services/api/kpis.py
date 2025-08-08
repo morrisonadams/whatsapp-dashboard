@@ -1,31 +1,67 @@
-from typing import List, Dict, Any
-import re, numpy as np, pandas as pd
+from typing import List, Dict, Any, Set
+import re, pandas as pd
 from collections import Counter
+from wordcloud import STOPWORDS as WC_STOPWORDS
 from parse import Message
+import emoji
 
 AFFECTION_TOKENS = [
     "love you","luv u","miss you","😘","❤️","❤","💕","💖",
     "babe","baby","hun","honey","cutie","sweetheart","proud of you"
 ]
 PROFANITY = ["fuck","shit","bitch","asshole","dick","cuck"]
+SEXUAL_WORDS = ["sex","sexy","naked","nude","dick","pussy","boobs","tits","cock","cum","horny"]
 PRONOUNS_WE = ["we","us","our","ours"]
 PRONOUNS_I = ["i","me","my","mine"]
 QUESTION_PAT = re.compile(r"\?\s*$|^\s*(?:who|what|when|where|why|how|can|do|did|are|is|should)\b", re.IGNORECASE)
 
-STOPWORDS = {
-    "the","a","and","to","of","in","i","you","it","is","for","on","me","my","your","we","our","us",
-    "are","be","at","this","that","was","so","but","with","have","not","do","just","im","its","like"
-}
+# Start with wordcloud's default stopwords and extend with chat-specific ones
+STOPWORDS = set(WC_STOPWORDS)
+STOPWORDS.update({"im", "us", "our", "ours", "your"})
 
-def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> Dict[str, List[Dict[str, int]]]:
-    out: Dict[str, List[Dict[str, int]]] = {}
-    for sender, sub in df[df["sender"].isin(participants)].groupby("sender"):
+def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> Dict[str, List[Dict[str, Any]]]:
+    out: Dict[str, List[Dict[str, Any]]] = {}
+    filtered = df[
+        df["sender"].isin(participants)
+        & (~df["has_media"])
+        & (~df["text"].str.contains("<media omitted>", case=False, na=False))
+    ]
+    for sender, sub in filtered.groupby("sender"):
         words: List[str] = []
+        tags: Dict[str, Set[str]] = {}
         for text in sub["text"].fillna(""):
             tokens = re.findall(r"[A-Za-z']+", text.lower())
-            words.extend([w for w in tokens if w not in STOPWORDS])
+            emoji_tokens = [d["emoji"] for d in emoji.emoji_list(text)]
+            for w in tokens:
+                if w in STOPWORDS:
+                    continue
+                words.append(w)
+                if w not in tags:
+                    tags[w] = set()
+                if w in PROFANITY:
+                    tags[w].add("swear")
+                if w in SEXUAL_WORDS:
+                    tags[w].add("sexual")
+            for e in emoji_tokens:
+                words.append(e)
+                if e not in tags:
+                    tags[e] = set()
+                tags[e].add("emoji")
         cnt = Counter(words)
-        out[str(sender)] = [{"name": w, "value": int(c)} for w, c in cnt.most_common(top_n)]
+
+        # start with overall top N
+        top_words = {w for w, _ in cnt.most_common(top_n)}
+        # ensure we also include top N for each tag category
+        all_tags = {t for ts in tags.values() for t in ts}
+        for t in all_tags:
+            tagged = [w for w in cnt if t in tags.get(w, set())]
+            top_words.update(
+                [w for w, _ in Counter({w: cnt[w] for w in tagged}).most_common(top_n)]
+            )
+        out[str(sender)] = [
+            {"name": w, "value": int(cnt[w]), "tags": sorted(list(tags.get(w, set())))}
+            for w in sorted(top_words, key=lambda x: cnt[x], reverse=True)
+        ]
     return out
 
 def to_df(messages: List[Message]) -> pd.DataFrame:
@@ -144,15 +180,14 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
             arr = arr.clip(lower=0)
             reply_simple.append({
                 "person": str(person),
-                "median": float(arr.median()),
-                "mean": float(arr.mean()),
+                "seconds": float(arr.mean()),
                 "n": int(arr.size),
             })
     # ensure all participants present
     present = {r["person"] for r in reply_simple}
     for p in participants:
         if str(p) not in present:
-            reply_simple.append({"person": str(p), "median": 0.0, "mean": 0.0, "n": 0})
+            reply_simple.append({"person": str(p), "seconds": 0.0, "n": 0})
 
     # Interruptions
     runs_df = interruptions(d)
@@ -221,5 +256,5 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
     }
     # legacy mirrors for compatibility
     payload["timeline"] = payload["timeline_messages"]
-    payload["reply_times_summary"] = [{"to": r["person"], "median": r["median"], "mean": r["mean"], "count": r["n"]} for r in reply_simple]
+    payload["reply_times_summary"] = [{"to": r["person"], "seconds": r["seconds"], "count": r["n"]} for r in reply_simple]
     return payload

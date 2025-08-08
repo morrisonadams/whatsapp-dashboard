@@ -85,6 +85,8 @@ async function fetchConflicts() {
   }, [participants]);
 
   const wordCloudParticipants = participants.slice(0, 2);
+  const wordCategories = ["emoji", "swear", "sexual"];
+  const [wordFilters, setWordFilters] = useState<string[]>([]);
 
   const dateFilter = (day: string) => {
     if (startDate && day < startDate) return false;
@@ -165,23 +167,22 @@ async function fetchConflicts() {
 
   const replyOption = () => {
     const rs = (kpis?.reply_simple || []) as Array<any>;
-    const metrics = ["median", "mean"];
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      legend: { data: participants, textStyle:{color: palette.text} },
-      xAxis: { type: "category", data: metrics, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      xAxis: { type: "category", data: participants, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series: participants.map(p => {
-        const row = rs.find((r:any)=>r.person===p) || {};
-        return {
-          name: p,
+      series: [
+        {
           type: "bar",
-          data: metrics.map(m => m === "median" ? (row.median || 0) : (row.mean || 0)),
-          itemStyle: { color: colorMap[p] }
-        };
-      })
+          data: participants.map(p => {
+            const row = rs.find((r:any)=>r.person===p) || {};
+            return { value: row.seconds || 0, itemStyle: { color: colorMap[p] } };
+          }),
+          barWidth: "40%"
+        }
+      ]
     };
   };
 
@@ -338,7 +339,11 @@ async function fetchConflicts() {
   };
 
   const wordCloudOption = (person: string) => {
-    const data = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number}>;
+    const raw = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number; tags?:string[]}>;
+    const data = (wordFilters.length
+      ? raw.filter(r => (r.tags || []).some(t => wordFilters.includes(t)))
+      : raw)
+      .slice(0, 50);
     return {
       backgroundColor: "transparent",
       tooltip: {},
@@ -347,7 +352,10 @@ async function fetchConflicts() {
         gridSize: 8,
         sizeRange: [12, 50],
         rotationRange: [0, 0],
-        textStyle: { color: colorMap[person] },
+        textStyle: {
+          color: colorMap[person],
+          fontFamily: "'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji','Android Emoji','EmojiSymbols','EmojiOne','Twemoji','sans-serif'"
+        },
         data
       }]
     };
@@ -430,7 +438,7 @@ async function fetchConflicts() {
             </div>
 
             <div className="grid grid-cols-1 gap-6">
-              <Card title="Time to reply (seconds) — median & mean">
+              <Card title="Seconds to reply">
                 <Chart option={replyOption()} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
               </Card>
@@ -446,7 +454,7 @@ async function fetchConflicts() {
                     Trend
                   </label>
                 </div>
-                <Chart option={timelineOption()} height={280} onEvents={{ dataZoom: handleZoom }} />
+                <Chart option={timelineOption()} height={280} onEvents={{ datazoom: handleZoom }} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
               </Card>
             </div>
@@ -497,6 +505,24 @@ async function fetchConflicts() {
 
             <div className="grid grid-cols-1 gap-6">
               <Card title="Word cloud by participant">
+                <div className="mb-2 flex flex-wrap gap-3">
+                  {wordCategories.map(cat => (
+                    <label key={cat} className="text-xs flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={wordFilters.includes(cat)}
+                        onChange={() =>
+                          setWordFilters(prev =>
+                            prev.includes(cat)
+                              ? prev.filter(c => c !== cat)
+                              : [...prev, cat]
+                          )
+                        }
+                      />
+                      {cat}
+                    </label>
+                  ))}
+                </div>
                 {wordCloudParticipants.length === 2 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {wordCloudParticipants.map(p => (
@@ -513,18 +539,27 @@ async function fetchConflicts() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card title="Questions (total & per person)">
+              <Card
+                title="Questions (total & per person)"
+                tooltip="Questions are messages that end with a '?' or start with words like 'who' or 'why'. Marked as unanswered if no one else replies within 15 minutes."
+              >
                 <div className="text-3xl">{kpis.questions.total}</div>
                 <div className="text-sm text-gray-300">Unanswered within 15m: {kpis.questions.unanswered_15m}</div>
                 {cardSplit("questions")}
                 <div className="mt-1 text-sm text-gray-300">Unanswered per person:</div>
                 {cardSplit("unanswered")}
               </Card>
-              <Card title="Attachments (total & per person)">
+              <Card
+                title="Attachments (total & per person)"
+                tooltip="Counts messages that include media or file attachments such as photos, videos, audio, or documents."
+              >
                 <div className="text-3xl">{kpis.media_total}</div>
                 {cardSplit("attachments")}
               </Card>
-              <Card title="Affection markers (total & per person)">
+              <Card
+                title="Affection markers (total & per person)"
+                tooltip="Messages containing affectionate words or emojis like 'love you', '😘', or '❤️'."
+              >
                 <div className="text-3xl">{kpis.affection_hits}</div>
                 {cardSplit("affection")}
               </Card>
