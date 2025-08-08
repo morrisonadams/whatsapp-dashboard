@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 import re, numpy as np, pandas as pd
+from collections import Counter
 from parse import Message
 
 AFFECTION_TOKENS = [
@@ -10,6 +11,22 @@ PROFANITY = ["fuck","shit","bitch","asshole","dick","cuck"]
 PRONOUNS_WE = ["we","us","our","ours"]
 PRONOUNS_I = ["i","me","my","mine"]
 QUESTION_PAT = re.compile(r"\?\s*$|^\s*(?:who|what|when|where|why|how|can|do|did|are|is|should)\b", re.IGNORECASE)
+
+STOPWORDS = {
+    "the","a","and","to","of","in","i","you","it","is","for","on","me","my","your","we","our","us",
+    "are","be","at","this","that","was","so","but","with","have","not","do","just","im","its","like"
+}
+
+def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> Dict[str, List[Dict[str, int]]]:
+    out: Dict[str, List[Dict[str, int]]] = {}
+    for sender, sub in df[df["sender"].isin(participants)].groupby("sender"):
+        words: List[str] = []
+        for text in sub["text"].fillna(""):
+            tokens = re.findall(r"[A-Za-z']+", text.lower())
+            words.extend([w for w in tokens if w not in STOPWORDS])
+        cnt = Counter(words)
+        out[str(sender)] = [{"name": w, "value": int(c)} for w, c in cnt.most_common(top_n)]
+    return out
 
 def to_df(messages: List[Message]) -> pd.DataFrame:
     rows = []
@@ -182,6 +199,8 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
     # Heatmap
     heat_df = heatmap_hour_weekday(d) if len(d)>0 else pd.DataFrame(columns=["weekday","hour","sender","count"])
 
+    word_cloud = word_counts(d, participants) if len(d)>0 else {}
+
     payload = {
         "participants": participants,
         "by_sender": by_sender_df.to_dict(orient="records"),
@@ -197,7 +216,8 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "affection_split": aff_split,
         "timeline_messages": timeline_messages_df.to_dict(orient="records"),
         "timeline_words": timeline_words_df.to_dict(orient="records"),
-        "heatmap": heat_df.to_dict(orient="records")
+        "heatmap": heat_df.to_dict(orient="records"),
+        "word_cloud": word_cloud
     }
     # legacy mirrors for compatibility
     payload["timeline"] = payload["timeline_messages"]
