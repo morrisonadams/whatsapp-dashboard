@@ -42,6 +42,14 @@ export default function Home() {
 
   const participants: string[] = useMemo(() => kpis?.participants ?? (kpis?.by_sender?.map((r:any)=>r.sender) ?? []), [kpis]);
 
+  const colorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    participants.forEach((p, i) => {
+      map[p] = palette.series[i % palette.series.length];
+    });
+    return map;
+  }, [participants]);
+
   const messagesOption = () => {
     const rows = kpis?.by_sender || [];
     return {
@@ -51,7 +59,11 @@ export default function Home() {
       xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
       yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
       series: [
-        { type: "bar", data: rows.map((r:any)=>r.messages), itemStyle: { color: palette.series[0] }, barWidth: "40%" }
+        {
+          type: "bar",
+          data: rows.map((r:any)=>({ value: r.messages, itemStyle: { color: colorMap[r.sender] } })),
+          barWidth: "40%"
+        }
       ]
     };
   };
@@ -65,25 +77,34 @@ export default function Home() {
       xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
       yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
       series: [
-        { type: "bar", data: rows.map((r:any)=>r.words), itemStyle: { color: palette.series[1] }, barWidth: "40%" }
+        {
+          type: "bar",
+          data: rows.map((r:any)=>({ value: r.words, itemStyle: { color: colorMap[r.sender] } })),
+          barWidth: "40%"
+        }
       ]
     };
   };
 
   const replyOption = () => {
     const rs = (kpis?.reply_simple || []) as Array<any>;
-    const cats = rs.map((r:any)=>r.person);
+    const metrics = ["median", "mean"];
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: {},
-      legend: { data: ["median","mean"], textStyle:{color: palette.text} },
-      xAxis: { type: "category", data: cats, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      legend: { data: participants, textStyle:{color: palette.text} },
+      xAxis: { type: "category", data: metrics, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series: [
-        { name:"median", type:"bar", data: rs.map((r:any)=>r.median), itemStyle:{ color: palette.series[2] }},
-        { name:"mean", type:"bar", data: rs.map((r:any)=>r.mean), itemStyle:{ color: palette.series[3] }}
-      ]
+      series: participants.map(p => {
+        const row = rs.find((r:any)=>r.person===p) || {};
+        return {
+          name: p,
+          type: "bar",
+          data: metrics.map(m => m === "median" ? (row.median || 0) : (row.mean || 0)),
+          itemStyle: { color: colorMap[p] }
+        };
+      })
     };
   };
 
@@ -93,9 +114,11 @@ export default function Home() {
     const senders = Array.from(new Set(tl.map((r:any)=>r.sender)));
     const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
     const series = senders.map((s: string, i:number) => ({
-      name: s, type: "line", smooth: true,
+      name: s,
+      type: "line",
+      smooth: true,
       lineStyle: { width: 3 },
-      itemStyle: { color: palette.series[i % palette.series.length] },
+      itemStyle: { color: colorMap[s] || palette.series[i % palette.series.length] },
       data: days.map((d: any) => {
         const row = tl.find((r:any)=>r.day===d && r.sender===s);
         return row ? (timelineMetric === "messages" ? row.messages : row.words) : 0;
