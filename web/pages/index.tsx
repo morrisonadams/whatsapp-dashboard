@@ -149,23 +149,22 @@ export default function Home() {
 
   const replyOption = () => {
     const rs = (kpis?.reply_simple || []) as Array<any>;
-    const metrics = ["median", "mean"];
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      legend: { data: participants, textStyle:{color: palette.text} },
-      xAxis: { type: "category", data: metrics, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      xAxis: { type: "category", data: participants, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series: participants.map(p => {
-        const row = rs.find((r:any)=>r.person===p) || {};
-        return {
-          name: p,
+      series: [
+        {
           type: "bar",
-          data: metrics.map(m => m === "median" ? (row.median || 0) : (row.mean || 0)),
-          itemStyle: { color: colorMap[p] }
-        };
-      })
+          data: participants.map(p => {
+            const row = rs.find((r:any)=>r.person===p) || {};
+            return { value: row.seconds || 0, itemStyle: { color: colorMap[p] } };
+          }),
+          barWidth: "40%"
+        }
+      ]
     };
   };
 
@@ -384,7 +383,7 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 gap-6">
-              <Card title="Time to reply (seconds) — median & mean">
+              <Card title="Seconds to reply">
                 <Chart option={replyOption()} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
               </Card>

@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-import re, numpy as np, pandas as pd
+import re, pandas as pd
 from collections import Counter
 from parse import Message
 
@@ -144,15 +144,14 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
             arr = arr.clip(lower=0)
             reply_simple.append({
                 "person": str(person),
-                "median": float(arr.median()),
-                "mean": float(arr.mean()),
+                "seconds": float(arr.mean()),
                 "n": int(arr.size),
             })
     # ensure all participants present
     present = {r["person"] for r in reply_simple}
     for p in participants:
         if str(p) not in present:
-            reply_simple.append({"person": str(p), "median": 0.0, "mean": 0.0, "n": 0})
+            reply_simple.append({"person": str(p), "seconds": 0.0, "n": 0})
 
     # Interruptions
     runs_df = interruptions(d)
@@ -221,5 +220,5 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
     }
     # legacy mirrors for compatibility
     payload["timeline"] = payload["timeline_messages"]
-    payload["reply_times_summary"] = [{"to": r["person"], "median": r["median"], "mean": r["mean"], "count": r["n"]} for r in reply_simple]
+    payload["reply_times_summary"] = [{"to": r["person"], "seconds": r["seconds"], "count": r["n"]} for r in reply_simple]
     return payload
