@@ -48,6 +48,7 @@ def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> D
                     tags[e] = set()
                 tags[e].add("emoji")
         cnt = Counter(words)
+
         # start with overall top N
         top_words = {w for w, _ in cnt.most_common(top_n)}
         # ensure we also include top N for each tag category
