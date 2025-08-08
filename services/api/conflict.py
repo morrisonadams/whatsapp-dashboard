@@ -22,9 +22,16 @@ def _analyze_month(month: str, df: pd.DataFrame, client: OpenAI, model: str) -> 
     """Send one month's chat to the model and parse conflict info."""
     lines = [f"{row['ts']:%Y-%m-%d}: {row['text']}" for _, row in df.iterrows()]
     prompt = (
-        "You are an assistant that finds conflicts in chat logs. "
-        "Return JSON with keys 'total_conflicts' and 'conflicts'. "
-        "Each conflict entry should have 'date' (YYYY-MM-DD) and 'summary'.\n\n"
+        "You are an expert assistant in analyzing chat logs for substantive interpersonal conflicts—"
+        "moments where one or both people experience real misalignment, emotional pain, disappointment, "
+        "or confusion (not just playful teasing). "
+        "Return only legitimate, emotionally significant conflicts. Ignore brattiness, playful criticisms, "
+        "and ongoing teasing unless they escalate into real misunderstandings, new boundaries, or feelings of hurt.\n"
+        "Output JSON with:\n"
+        "total_conflicts: integer, count of significant or potentially relationship-altering conflicts.\n"
+        "conflicts: an array of objects, each with:\n"
+        "date (YYYY-MM-DD): first date where the conflict became visible.\n"
+        "summary: a concise, objective description in neutral tone of the disagreement or misalignment, including both perspectives if possible.\n\n"
         f"Chat log for {month}:\n" + "\n".join(lines)
     )
     resp = client.responses.create(
