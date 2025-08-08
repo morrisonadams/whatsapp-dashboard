@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 // Load the wordcloud extension on the client before initializing ECharts.
 const ReactECharts = dynamic(async () => {
   if (typeof window !== "undefined") {
-    await import("echarts-wordcloud/dist/echarts-wordcloud.js");
+    await import("echarts-wordcloud");
   }
   return import("echarts-for-react");
 }, { ssr: false });
