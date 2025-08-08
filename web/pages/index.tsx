@@ -26,6 +26,7 @@ export default function Home() {
   const [heatPerson, setHeatPerson] = useState<string>("All");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
 
   useEffect(() => {
     fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version").then(r=>r.json()).then(d=>setApiVersion(d.version||"?"));
@@ -41,6 +42,10 @@ export default function Home() {
       setEndDate(days[days.length - 1]);
     }
   }, [kpis]);
+
+  useEffect(() => {
+    setZoomRange(null);
+  }, [timelineMetric, startDate, endDate, kpis]);
 
   const onUpload = async (file: File) => {
     setBusy(true); setErr(null);
@@ -93,6 +98,19 @@ export default function Home() {
     const totalWords = (kpis.timeline_words || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.words,0);
     return { messages: totalMessages, words: totalWords };
   }, [kpis, startDate, endDate]);
+
+  const handleZoom = (e: any) => {
+    const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
+    if (dz.start == null || dz.end == null) return;
+    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
+    const tl = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
+    const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
+    if (days.length < 2) return;
+    const len = days.length - 1;
+    const startIdx = Math.round((dz.start / 100) * len);
+    const endIdx = Math.round((dz.end / 100) * len);
+    setZoomRange([startIdx, endIdx]);
+  };
 
   const messagesOption = () => {
     const rows = filteredBySender;
@@ -154,14 +172,54 @@ export default function Home() {
 
   const timelineOption = () => {
     const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
-    const tl = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
-    const senders = Array.from(new Set(tl.map((r:any)=>r.sender)));
-    const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
-    const series = senders.map((s: string, i:number) => {
-      const values = days.map((d: any) => {
-        const row = tl.find((r:any)=>r.day===d && r.sender===s);
-        return row ? (timelineMetric === "messages" ? row.messages : row.words) : 0;
+    const tlAll = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
+    const allDays: string[] = Array.from(new Set<string>(tlAll.map((r:any)=>r.day))).sort();
+    let startIdx = zoomRange ? zoomRange[0] : 0;
+    let endIdx = zoomRange ? zoomRange[1] : allDays.length - 1;
+    startIdx = Math.max(0, Math.min(startIdx, allDays.length - 1));
+    endIdx = Math.max(0, Math.min(endIdx, allDays.length - 1));
+    if (endIdx < startIdx) endIdx = startIdx;
+    const visibleDays = allDays.slice(startIdx, endIdx + 1);
+    const visibleTl = tlAll.filter((r:any) => {
+      const idx = allDays.indexOf(r.day);
+      return idx >= startIdx && idx <= endIdx;
+    });
+    const senders: string[] = Array.from(new Set(visibleTl.map((r:any)=>r.sender)));
+    const useWeeks = visibleDays.length > 90;
+    let axis: string[] = [];
+    const dataPerSender: Record<string, number[]> = {};
+    senders.forEach(s => dataPerSender[s] = []);
+    if (useWeeks) {
+      const getWeekStart = (dStr: string) => {
+        const d = new Date(dStr + "T00:00:00Z");
+        const day = d.getUTCDay();
+        const diff = (day + 6) % 7;
+        d.setUTCDate(d.getUTCDate() - diff);
+        return d.toISOString().slice(0,10);
+      };
+      const weekMap: Record<string, Record<string, number>> = {};
+      visibleTl.forEach((r:any) => {
+        const week = getWeekStart(r.day);
+        if (!weekMap[week]) weekMap[week] = {};
+        weekMap[week][r.sender] = (weekMap[week][r.sender] || 0) + (timelineMetric === "messages" ? r.messages : r.words);
       });
+      axis = Object.keys(weekMap).sort();
+      senders.forEach(s => {
+        dataPerSender[s] = axis.map(w => weekMap[w][s] || 0);
+      });
+    } else {
+      const dayMap: Record<string, Record<string, number>> = {};
+      visibleTl.forEach((r:any) => {
+        if (!dayMap[r.day]) dayMap[r.day] = {};
+        dayMap[r.day][r.sender] = (timelineMetric === "messages" ? r.messages : r.words);
+      });
+      axis = visibleDays;
+      senders.forEach(s => {
+        dataPerSender[s] = axis.map(d => (dayMap[d] && dayMap[d][s]) || 0);
+      });
+    }
+    const series = senders.map((s: string, i:number) => {
+      const values = dataPerSender[s];
       let markLine: any = undefined;
       if (showTrend && values.length > 1) {
         const n = values.length;
@@ -180,7 +238,7 @@ export default function Home() {
         markLine = {
           symbol: "none",
           lineStyle: { type: "dashed", color: colorMap[s] || palette.series[i % palette.series.length] },
-          data: [[{ coord: [days[0], startY] }, { coord: [days[n - 1], endY] }]]
+          data: [[{ coord: [axis[0], startY] }, { coord: [axis[n - 1], endY] }]]
         };
       }
       return {
@@ -193,13 +251,19 @@ export default function Home() {
         ...(markLine ? { markLine } : {})
       };
     });
+    const lenAll = Math.max(1, allDays.length - 1);
+    const startPercent = (startIdx / lenAll) * 100;
+    const endPercent = (endIdx / lenAll) * 100;
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      dataZoom: [{ type: 'inside' }, { type: 'slider' }],
+      dataZoom: [
+        { type: 'inside', start: startPercent, end: endPercent },
+        { type: 'slider', start: startPercent, end: endPercent }
+      ],
       legend: { data: senders, textStyle:{color: palette.text} },
-      xAxis: { type: "category", data: days, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      xAxis: { type: "category", data: axis, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series
     };
@@ -337,7 +401,7 @@ export default function Home() {
                     Trend
                   </label>
                 </div>
-                <Chart option={timelineOption()} height={280} />
+                <Chart option={timelineOption()} height={280} onEvents={{ dataZoom: handleZoom }} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
               </Card>
             </div>
