@@ -20,6 +20,7 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
+  const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -152,17 +153,42 @@ export default function Home() {
     const tl = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
     const senders = Array.from(new Set(tl.map((r:any)=>r.sender)));
     const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
-    const series = senders.map((s: string, i:number) => ({
-      name: s,
-      type: "line",
-      smooth: true,
-      lineStyle: { width: 3 },
-      itemStyle: { color: colorMap[s] || palette.series[i % palette.series.length] },
-      data: days.map((d: any) => {
+    const series = senders.map((s: string, i:number) => {
+      const values = days.map((d: any) => {
         const row = tl.find((r:any)=>r.day===d && r.sender===s);
         return row ? (timelineMetric === "messages" ? row.messages : row.words) : 0;
-      })
-    }));
+      });
+      let markLine: any = undefined;
+      if (showTrend && values.length > 1) {
+        const n = values.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (let j = 0; j < n; j++) {
+          sumX += j;
+          sumY += values[j];
+          sumXY += j * values[j];
+          sumXX += j * j;
+        }
+        const denom = n * sumXX - sumX * sumX || 1;
+        const slope = (n * sumXY - sumX * sumY) / denom;
+        const intercept = (sumY - slope * sumX) / n;
+        const startY = intercept;
+        const endY = intercept + slope * (n - 1);
+        markLine = {
+          symbol: "none",
+          lineStyle: { type: "dashed", color: colorMap[s] || palette.series[i % palette.series.length] },
+          data: [[{ coord: [days[0], startY] }, { coord: [days[n - 1], endY] }]]
+        };
+      }
+      return {
+        name: s,
+        type: "line",
+        smooth: true,
+        lineStyle: { width: 3 },
+        itemStyle: { color: colorMap[s] || palette.series[i % palette.series.length] },
+        data: values,
+        ...(markLine ? { markLine } : {})
+      };
+    });
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
@@ -274,15 +300,22 @@ export default function Home() {
               </Card>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               <Card title="Time to reply (seconds) — median & mean">
                 <Chart option={replyOption()} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
               </Card>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
               <Card title="Timeline">
-                <div className="flex gap-2 mb-2">
+                <div className="flex gap-2 mb-2 items-center">
                   <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
                   <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
+                  <label className="flex items-center text-sm ml-auto">
+                    <input type="checkbox" className="mr-1" checked={showTrend} onChange={e=>setShowTrend(e.target.checked)} />
+                    Trend
+                  </label>
                 </div>
                 <Chart option={timelineOption()} height={280} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
