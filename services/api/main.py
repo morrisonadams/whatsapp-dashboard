@@ -6,6 +6,9 @@ from parse import parse_export
 from kpis import to_df, compute
 from conflict import analyze_conflicts_by_month
 import io
+from dotenv import load_dotenv
+
+load_dotenv()
 
 API_VERSION = "0.2.9"
 app = FastAPI(title="WhatsApp Relationship Analytics API", version="0.2.9")
