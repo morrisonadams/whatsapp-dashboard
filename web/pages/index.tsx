@@ -1,0 +1,246 @@
+
+import { useEffect, useMemo, useState } from "react";
+import { getKPIs, loadSample, uploadFile } from "@/lib/api";
+import Card from "@/components/Card";
+import Chart from "@/components/Chart";
+
+type KPI = any;
+
+const palette = {
+  bg: "radial-gradient(1200px 600px at 20% 10%, rgba(143,76,255,0.25), transparent 60%), radial-gradient(1000px 600px at 80% 20%, rgba(0,184,255,0.18), transparent 60%), radial-gradient(1000px 600px at 50% 80%, rgba(255,80,150,0.18), transparent 60%), #0b0f17",
+  text: "#e6e8ef",
+  subtext: "#9aa4b2",
+  surfaces: "#0f1521",
+  series: ["#a78bfa", "#22d3ee", "#f59e0b", "#ef4444", "#10b981", "#f472b6"]
+};
+
+export default function Home() {
+  const [kpis, setKpis] = useState<KPI | null>(null);
+  const [apiVersion, setApiVersion] = useState<string>("?");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
+  const [heatPerson, setHeatPerson] = useState<string>("All");
+
+  useEffect(() => {
+    fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version").then(r=>r.json()).then(d=>setApiVersion(d.version||"?"));
+    // auto-load sample on first visit
+    loadSample().then(setKpis).catch(() => {});
+  }, []);
+
+  const onUpload = async (file: File) => {
+    setBusy(true); setErr(null);
+    try {
+      const k = await uploadFile(file);
+      setKpis(k);
+    } catch (e: any) {
+      setErr(e?.message || "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const participants: string[] = useMemo(() => kpis?.participants ?? (kpis?.by_sender?.map((r:any)=>r.sender) ?? []), [kpis]);
+
+  const messagesOption = () => {
+    const rows = kpis?.by_sender || [];
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: {},
+      xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
+      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
+      series: [
+        { type: "bar", data: rows.map((r:any)=>r.messages), itemStyle: { color: palette.series[0] }, barWidth: "40%" }
+      ]
+    };
+  };
+
+  const wordsOption = () => {
+    const rows = kpis?.by_sender || [];
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: {},
+      xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
+      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
+      series: [
+        { type: "bar", data: rows.map((r:any)=>r.words), itemStyle: { color: palette.series[1] }, barWidth: "40%" }
+      ]
+    };
+  };
+
+  const replyOption = () => {
+    const rs = (kpis?.reply_simple || []) as Array<any>;
+    const cats = rs.map((r:any)=>r.person);
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: {},
+      legend: { data: ["median","mean"], textStyle:{color: palette.text} },
+      xAxis: { type: "category", data: cats, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      series: [
+        { name:"median", type:"bar", data: rs.map((r:any)=>r.median), itemStyle:{ color: palette.series[2] }},
+        { name:"mean", type:"bar", data: rs.map((r:any)=>r.mean), itemStyle:{ color: palette.series[3] }}
+      ]
+    };
+  };
+
+  const timelineOption = () => {
+    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
+    const tl = kpis?.[key] || [];
+    const senders = Array.from(new Set(tl.map((r:any)=>r.sender)));
+    const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
+    const series = senders.map((s: string, i:number) => ({
+      name: s, type: "line", smooth: true,
+      lineStyle: { width: 3 },
+      itemStyle: { color: palette.series[i % palette.series.length] },
+      data: days.map((d: any) => {
+        const row = tl.find((r:any)=>r.day===d && r.sender===s);
+        return row ? (timelineMetric === "messages" ? row.messages : row.words) : 0;
+      })
+    }));
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: {},
+      legend: { data: senders, textStyle:{color: palette.text} },
+      xAxis: { type: "category", data: days, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      series
+    };
+  };
+
+  const heatOption = () => {
+    const hm = (kpis?.heatmap || []).filter((r:any)=> heatPerson==="All" ? true : r.sender===heatPerson);
+    const hours = Array.from({length:24}).map((_,i)=>i);
+    const weekdays = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+    const mat = Array.from({length:7},()=>Array(24).fill(0));
+    hm.forEach((r:any)=>{ mat[r.weekday][r.hour] += r.count; });
+    const data:any[] = [];
+    for (let w=0; w<7; w++) for (let h=0; h<24; h++) data.push([h, w, mat[w][h]]);
+    const vmax = Math.max(1, ...data.map((d:any)=>d[2]));
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: {},
+      xAxis: { type: "category", data: hours, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "category", data: weekdays, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      visualMap: { min: 0, max: vmax, calculable: true, orient:"horizontal", left:"center", textStyle:{color: palette.text} },
+      series: [{
+        type: "heatmap",
+        data,
+        label: { show: false },
+      }]
+    };
+  };
+
+  const affSplit = (kpis?.affection_split ?? []) as Array<{sender:string; affection:number}>;
+  const qSplit = (kpis?.questions_split ?? []) as Array<{sender:string; questions:number; unanswered_15m:number}>;
+  const bySender = (kpis?.by_sender ?? []) as Array<{sender:string; media:number}>;
+
+  const cardSplit = (metric: "affection" | "questions" | "unanswered" | "attachments") => {
+    const rows = participants.map(p => {
+      if (metric==="attachments") {
+        const r = bySender.find(r=>r.sender===p);
+        return { sender: p, value: r ? r.media : 0 };
+      } else if (metric==="affection") {
+        const r = affSplit.find(r=>r.sender===p);
+        return { sender: p, value: r ? r.affection : 0 };
+      } else if (metric==="questions") {
+        const r = qSplit.find(r=>r.sender===p);
+        return { sender: p, value: r ? r.questions : 0 };
+      } else {
+        const r = qSplit.find(r=>r.sender===p);
+        return { sender: p, value: r ? r.unanswered_15m : 0 };
+      }
+    });
+    return (
+      <div className="mt-2 text-sm text-gray-300 grid grid-cols-2 gap-2">
+        {rows.map(r => <div key={r.sender} className="flex items-center justify-between"><span>{r.sender}</span><span className="font-semibold">{r.value}</span></div>)}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ background: palette.bg }} className="min-h-screen text-white">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">WhatsApp Relationship Analytics - v0.2.9</h1>
+          <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
+            {busy ? "Uploading..." : "Upload .txt"}
+            <input type="file" className="hidden" accept=".txt" onChange={(e)=>e.target.files&&onUpload(e.target.files[0])} />
+          </label>
+        </div>
+        {err && <div className="text-red-400">{err}</div>}
+        {!kpis && <div className="text-gray-300">Load sample or upload a WhatsApp export.</div>}
+        {kpis && (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card title="Messages"><div className="text-2xl font-bold">{kpis.totals.messages}</div></Card>
+              <Card title="Words"><div className="text-2xl font-bold">{kpis.totals.words}</div></Card>
+              <Card title="We-ness ratio"><div className="text-2xl font-bold">{kpis.we_ness_ratio.toFixed(2)}</div></Card>
+              <Card title="Profanity hits"><div className="text-2xl font-bold">{kpis.profanity_hits}</div></Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card title="Messages by sender">
+                <Chart option={messagesOption()} />
+              </Card>
+              <Card title="Words by sender">
+                <Chart option={wordsOption()} />
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card title="Time to reply (seconds) — median & mean">
+                <Chart option={replyOption()} />
+                {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+              </Card>
+              <Card title="Timeline">
+                <div className="flex gap-2 mb-2">
+                  <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
+                  <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
+                </div>
+                <Chart option={timelineOption()} height={280} />
+                {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              <Card title="Daily rhythm heatmap (weekday × hour)">
+                <div className="flex gap-2 mb-2">
+                  <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
+                  {participants.map(p => (
+                    <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
+                  ))}
+                </div>
+                <Chart option={heatOption()} height={320} />
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card title="Questions (total & per person)">
+                <div className="text-3xl">{kpis.questions.total}</div>
+                <div className="text-sm text-gray-300">Unanswered within 15m: {kpis.questions.unanswered_15m}</div>
+                {cardSplit("questions")}
+                <div className="mt-1 text-sm text-gray-300">Unanswered per person:</div>
+                {cardSplit("unanswered")}
+              </Card>
+              <Card title="Attachments (total & per person)">
+                <div className="text-3xl">{kpis.media_total}</div>
+                {cardSplit("attachments")}
+              </Card>
+              <Card title="Affection markers (total & per person)">
+                <div className="text-3xl">{kpis.affection_hits}</div>
+                {cardSplit("affection")}
+              </Card>
+            </div>
+          </>
+        )}
+        <div className="text-xs text-gray-400">v0.2.9 — visual refinements • API v{apiVersion}</div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,209 @@
+from typing import List, Dict, Any
+import re, numpy as np, pandas as pd
+from parse import Message
+
+AFFECTION_TOKENS = [
+    "love you","luv u","miss you","😘","❤️","❤","💕","💖",
+    "babe","baby","hun","honey","cutie","sweetheart","proud of you"
+]
+PROFANITY = ["fuck","shit","bitch","asshole","dick","cuck"]
+PRONOUNS_WE = ["we","us","our","ours"]
+PRONOUNS_I = ["i","me","my","mine"]
+QUESTION_PAT = re.compile(r"\?\s*$|^\s*(?:who|what|when|where|why|how|can|do|did|are|is|should)\b", re.IGNORECASE)
+
+def to_df(messages: List[Message]) -> pd.DataFrame:
+    rows = []
+    for i, m in enumerate(messages):
+        rows.append({
+            "i": i,
+            "ts": m.ts,
+            "sender": m.sender or "",
+            "text": m.text or "",
+            "has_media": m.has_media,
+            "is_system": m.is_system,
+            "n_words": len(m.text.split()) if m.text else 0,
+            "n_chars": len(m.text) if m.text else 0,
+        })
+    df = pd.DataFrame(rows).sort_values("ts").reset_index(drop=True)
+    return df
+
+def reply_pairs(df: pd.DataFrame) -> pd.DataFrame:
+    """Adjacent-only pairing: reply is the next message if it's from the other sender."""
+    pairs = []
+    for idx in range(len(df) - 1):
+        cur = df.iloc[idx]
+        nxt = df.iloc[idx + 1]
+        if cur["sender"] and nxt["sender"] and cur["sender"] != nxt["sender"]:
+            pairs.append({"from": cur["sender"], "to": nxt["sender"], "sec": (nxt["ts"] - cur["ts"]).total_seconds()})
+    return pd.DataFrame(pairs)
+
+def reply_pairs_general(df: pd.DataFrame) -> pd.DataFrame:
+    """For each message, find the next message by a *different* sender (not just adjacent)."""
+    pairs = []
+    n = len(df)
+    for i in range(n - 1):
+        cur = df.iloc[i]
+        cur_sender = cur["sender"]
+        j = i + 1
+        while j < n and df.iloc[j]["sender"] == cur_sender:
+            j += 1
+        if j >= n:
+            break
+        nxt = df.iloc[j]
+        delta = (nxt["ts"] - cur["ts"]).total_seconds()
+        if delta >= 0:
+            pairs.append({"initiator": cur_sender, "responder": nxt["sender"], "sec": float(delta)})
+    return pd.DataFrame(pairs)
+
+def interruptions(df: pd.DataFrame) -> pd.DataFrame:
+    runs = []
+    if len(df) == 0:
+        return pd.DataFrame()
+    df = df.reset_index(drop=True)
+    cur_sender = df.iloc[0]["sender"]
+    run_len = 1
+    for idx in range(1, len(df)):
+        s = df.iloc[idx]["sender"]
+        if s == cur_sender:
+            run_len += 1
+        else:
+            runs.append({"sender": cur_sender, "len": run_len})
+            cur_sender = s
+            run_len = 1
+    runs.append({"sender": cur_sender, "len": run_len})
+    return pd.DataFrame(runs)
+
+def heatmap_hour_weekday(df: pd.DataFrame) -> pd.DataFrame:
+    d = df[~df["is_system"]].copy()
+    d["hour"] = d["ts"].dt.hour
+    d["weekday"] = d["ts"].dt.weekday
+    return d.groupby(["weekday","hour","sender"]).size().reset_index(name="count")
+
+def we_ness(df: pd.DataFrame) -> float:
+    def count_tokens(text, toks):
+        if not text: return 0
+        txt = re.sub(r"[^a-zA-Z\s]", " ", text.lower())
+        words = txt.split()
+        return sum(1 for w in words if w in toks)
+    we = int(df["text"].fillna("").apply(lambda t: count_tokens(t, PRONOUNS_WE)).sum())
+    i_tokens = int(df["text"].fillna("").apply(lambda t: count_tokens(t, PRONOUNS_I)).sum())
+    return float(we / max(1, we + i_tokens))
+
+def affection_hits(df: pd.DataFrame) -> int:
+    hits = 0
+    for tok in AFFECTION_TOKENS:
+        hits += int(df["text"].str.contains(re.escape(tok), case=False, na=False).sum())
+    return hits
+
+def profanity_hits(df: pd.DataFrame) -> int:
+    if len(PROFANITY)==0: return 0
+    pat = re.compile("|".join(re.escape(w) for w in PROFANITY), re.IGNORECASE)
+    return int(df["text"].str.contains(pat, na=False).sum())
+
+def compute(df: pd.DataFrame) -> Dict[str, Any]:
+    d = df[~df["is_system"]].copy().reset_index(drop=True)
+    # Coerce timestamps to pandas datetime, drop NaT, and sort
+    d["ts"] = pd.to_datetime(d["ts"], errors="coerce")
+    d = d.dropna(subset=["ts"]).sort_values("ts").reset_index(drop=True)
+
+    participants = list(d["sender"].dropna().unique())
+
+    by_sender_df = d.groupby("sender").agg(
+        messages=("i","count"),
+        words=("n_words","sum"),
+        media=("has_media","sum")
+    ).reset_index()
+
+    totals = {
+        "messages": int(by_sender_df["messages"].sum()) if len(by_sender_df)>0 else 0,
+        "words": int(by_sender_df["words"].sum()) if len(by_sender_df)>0 else 0
+    }
+
+    # Reply stats (general next-other-sender, fallback to adjacent)
+    rp = reply_pairs_general(d)
+    if rp.empty:
+        rp_adj = reply_pairs(d)
+        if not rp_adj.empty:
+            rp = rp_adj.rename(columns={"to":"responder"})
+    reply_simple = []
+    if not rp.empty:
+        for person, arr in rp.groupby("responder")["sec"]:
+            arr = arr.clip(lower=0)
+            reply_simple.append({
+                "person": str(person),
+                "median": float(arr.median()),
+                "mean": float(arr.mean()),
+                "n": int(arr.size),
+            })
+    # ensure all participants present
+    present = {r["person"] for r in reply_simple}
+    for p in participants:
+        if str(p) not in present:
+            reply_simple.append({"person": str(p), "median": 0.0, "mean": 0.0, "n": 0})
+
+    # Interruptions
+    runs_df = interruptions(d)
+    interrupts = runs_df[runs_df["len"]>=2].groupby("sender")["len"].agg(["count","max"]).reset_index() if not runs_df.empty else pd.DataFrame()
+
+    # Questions and unanswered within 15 minutes
+    d["is_question"] = d["text"].fillna("").str.contains(QUESTION_PAT)
+    d["next_ts"] = d["ts"].shift(-1)
+    d["next_sender"] = d["sender"].shift(-1)
+    fifteen = pd.Timedelta(minutes=15)
+    d["answered_15m"] = (~d["is_question"]) | ((d["next_sender"] != d["sender"]) & ((d["next_ts"] - d["ts"]) <= fifteen))
+    questions_total = int(d["is_question"].sum())
+    unanswered_total = int((d["is_question"] & ~d["answered_15m"]).sum())
+
+    q_counts = d.groupby("sender")["is_question"].sum().astype(int) if len(d)>0 else pd.Series(dtype=int)
+    tmp = d[d["is_question"]].copy()
+    un_counts = tmp.groupby("sender").apply(lambda g: (~g["answered_15m"]).sum()).astype(int) if len(tmp)>0 else pd.Series(dtype=int)
+    q_split = [{"sender": p, "questions": int(q_counts.get(p,0)), "unanswered_15m": int(un_counts.get(p,0))} for p in participants]
+
+    # Profanity + we-ness + affection
+    prof_total = profanity_hits(d)
+    we_ratio = we_ness(d)
+    aff_split = []
+    for p, sub in d.groupby("sender"):
+        cnt = 0
+        for tok in AFFECTION_TOKENS:
+            cnt += int(sub["text"].str.contains(re.escape(tok), case=False, na=False).sum())
+        aff_split.append({"sender": p, "affection": int(cnt)})
+    for p in participants:
+        if not any(r["sender"]==p for r in aff_split):
+            aff_split.append({"sender": p, "affection": 0})
+    aff_total = int(sum(r["affection"] for r in aff_split))
+
+    # Timeline strings
+    if len(d)>0:
+        day = d.copy()
+        day["day"] = day["ts"].dt.strftime("%Y-%m-%d")
+        timeline_messages_df = day.groupby(["day","sender"]).size().reset_index(name="messages")
+        timeline_words_df = day.groupby(["day","sender"])["n_words"].sum().reset_index(name="words")
+    else:
+        timeline_messages_df = pd.DataFrame(columns=["day","sender","messages"])
+        timeline_words_df = pd.DataFrame(columns=["day","sender","words"])
+
+    # Heatmap
+    heat_df = heatmap_hour_weekday(d) if len(d)>0 else pd.DataFrame(columns=["weekday","hour","sender","count"])
+
+    payload = {
+        "participants": participants,
+        "by_sender": by_sender_df.to_dict(orient="records"),
+        "totals": totals,
+        "reply_simple": reply_simple,
+        "interruptions": interrupts.to_dict(orient="records"),
+        "questions": {"total": questions_total, "unanswered_15m": unanswered_total},
+        "questions_split": q_split,
+        "media_total": int(d["has_media"].sum()) if len(d)>0 else 0,
+        "profanity_hits": prof_total,
+        "we_ness_ratio": we_ratio,
+        "affection_hits": aff_total,
+        "affection_split": aff_split,
+        "timeline_messages": timeline_messages_df.to_dict(orient="records"),
+        "timeline_words": timeline_words_df.to_dict(orient="records"),
+        "heatmap": heat_df.to_dict(orient="records")
+    }
+    # legacy mirrors for compatibility
+    payload["timeline"] = payload["timeline_messages"]
+    payload["reply_times_summary"] = [{"to": r["person"], "median": r["median"], "mean": r["mean"], "count": r["n"]} for r in reply_simple]
+    return payload
