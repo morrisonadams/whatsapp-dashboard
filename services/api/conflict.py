@@ -30,7 +30,6 @@ def _analyze_month(month: str, df: pd.DataFrame, client: OpenAI, model: str) -> 
     resp = client.responses.create(
         model=model,
         input=prompt,
-        response_format={"type": "json_object"},
     )
     # The Responses API exposes a convenience property that contains
     # the concatenated text for the assistant's message.  Using this is
