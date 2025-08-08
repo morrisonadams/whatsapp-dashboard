@@ -13,6 +13,7 @@ const palette = {
   surfaces: "#0f1521",
   series: ["#a78bfa", "#22d3ee", "#f59e0b", "#ef4444", "#10b981", "#f472b6"]
 };
+const formatNumber = (n: number) => n.toLocaleString();
 
 export default function Home() {
   const [kpis, setKpis] = useState<KPI | null>(null);
@@ -94,9 +95,9 @@ export default function Home() {
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
-      tooltip: {},
+      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
-      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
+      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
       series: [
         {
           type: "bar",
@@ -112,9 +113,9 @@ export default function Home() {
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
-      tooltip: {},
+      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
-      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
+      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
       series: [
         {
           type: "bar",
@@ -131,10 +132,10 @@ export default function Home() {
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
-      tooltip: {},
+      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       legend: { data: participants, textStyle:{color: palette.text} },
       xAxis: { type: "category", data: metrics, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: participants.map(p => {
         const row = rs.find((r:any)=>r.person===p) || {};
         return {
@@ -166,11 +167,11 @@ export default function Home() {
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
-      tooltip: {},
+      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       dataZoom: [{ type: 'inside' }, { type: 'slider' }],
       legend: { data: senders, textStyle:{color: palette.text} },
       xAxis: { type: "category", data: days, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series
     };
   };
@@ -187,7 +188,7 @@ export default function Home() {
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
-      tooltip: {},
+      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: hours, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "category", data: weekdays, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       visualMap: { min: 0, max: vmax, calculable: true, orient:"horizontal", left:"center", textStyle:{color: palette.text} },
