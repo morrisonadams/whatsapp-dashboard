@@ -133,7 +133,9 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
     reply_simple = []
     for p in parts:
         v = pairs[pairs["to"] == p]["dt_sec"]
-        reply_simple.append({"person": p, "median": float(v.median()) if len(v)>0 else 0.0, "mean": float(v.mean()) if len(v)>0 else 0.0})
+        reply_simple.append({"person": p,
+                             "median": (float(v.median())/60) if len(v)>0 else 0.0,
+                             "mean": (float(v.mean())/60) if len(v)>0 else 0.0})
 
     q = df[~df["is_system"] & df["text"].str.contains(r"\?\s*$", regex=True)]
     unanswered_total = 0

@@ -134,7 +134,7 @@ export default function Home() {
       tooltip: {},
       legend: { data: participants, textStyle:{color: palette.text} },
       xAxis: { type: "category", data: metrics, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: "minutes", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: participants.map(p => {
         const row = rs.find((r:any)=>r.person===p) || {};
         return {
@@ -275,7 +275,7 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card title="Time to reply (seconds) — median & mean">
+              <Card title="Time to reply (minutes) — median & mean">
                 <Chart option={replyOption()} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
               </Card>

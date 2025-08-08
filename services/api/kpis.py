@@ -127,8 +127,8 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
             arr = arr.clip(lower=0)
             reply_simple.append({
                 "person": str(person),
-                "median": float(arr.median()),
-                "mean": float(arr.mean()),
+                "median": float(arr.median()) / 60,
+                "mean": float(arr.mean()) / 60,
                 "n": int(arr.size),
             })
     # ensure all participants present
