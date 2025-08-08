@@ -69,7 +69,7 @@ export default function Home() {
   }, [participants]);
 
   const wordCloudParticipants = participants.slice(0, 2);
-  const wordCategories = ["emoji", "swear", "sexual"];
+  const wordCategories = ["emoji", "swear", "sexual", "space"];
   const [wordFilters, setWordFilters] = useState<string[]>([]);
 
   const dateFilter = (day: string) => {
