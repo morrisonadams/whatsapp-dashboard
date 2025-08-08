@@ -460,18 +460,27 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card title="Questions (total & per person)">
+              <Card
+                title="Questions (total & per person)"
+                tooltip="Questions are messages that end with a '?' or start with words like 'who' or 'why'. Marked as unanswered if no one else replies within 15 minutes."
+              >
                 <div className="text-3xl">{kpis.questions.total}</div>
                 <div className="text-sm text-gray-300">Unanswered within 15m: {kpis.questions.unanswered_15m}</div>
                 {cardSplit("questions")}
                 <div className="mt-1 text-sm text-gray-300">Unanswered per person:</div>
                 {cardSplit("unanswered")}
               </Card>
-              <Card title="Attachments (total & per person)">
+              <Card
+                title="Attachments (total & per person)"
+                tooltip="Counts messages that include media or file attachments such as photos, videos, audio, or documents."
+              >
                 <div className="text-3xl">{kpis.media_total}</div>
                 {cardSplit("attachments")}
               </Card>
-              <Card title="Affection markers (total & per person)">
+              <Card
+                title="Affection markers (total & per person)"
+                tooltip="Messages containing affectionate words or emojis like 'love you', '😘', or '❤️'."
+              >
                 <div className="text-3xl">{kpis.affection_hits}</div>
                 {cardSplit("affection")}
               </Card>
