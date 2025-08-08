@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, loadSample, uploadFile } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
-import 'echarts-wordcloud';
 
 type KPI = any;
 
