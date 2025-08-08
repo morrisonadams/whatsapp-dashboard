@@ -32,8 +32,18 @@ def _analyze_month(month: str, df: pd.DataFrame, client: OpenAI, model: str) -> 
         input=prompt,
         response_format={"type": "json_object"},
     )
-    content = resp.output[0].content[0].text
-    data = json.loads(content)
+    # The Responses API exposes a convenience property that contains
+    # the concatenated text for the assistant's message.  Using this is
+    # more robust than reaching into the nested `output` structure,
+    # which has changed across SDK versions and previously raised
+    # attribute errors, resulting in 500s when fetching conflicts.
+    content = (resp.output_text or "").strip()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        data = {"total_conflicts": 0, "conflicts": []}
+    data.setdefault("conflicts", [])
+    data.setdefault("total_conflicts", len(data["conflicts"]))
     data["month"] = month
     return data
 

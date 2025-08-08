@@ -24,7 +24,16 @@ export async function uploadFile(file: File) {
 
 export async function getConflicts() {
   const res = await fetch(`${API_BASE}/conflicts`);
-  if (!res.ok) throw new Error("No conflicts yet, load sample or upload");
+  if (!res.ok) {
+    let msg = "Failed to fetch conflicts";
+    try {
+      const err = await res.json();
+      msg = err.detail || JSON.stringify(err);
+    } catch {
+      msg = await res.text();
+    }
+    throw new Error(msg);
+  }
   const data = await res.json();
   return data.months;
 }
