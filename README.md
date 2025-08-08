@@ -4,6 +4,8 @@ Two services:
 - **api**: FastAPI with parser and KPI engine
 - **web**: Next.js dashboard with Tailwind and shadcn/ui using Apache ECharts
 
+Word clouds categorize terms, highlighting emoji, swear, sexual, and space-themed words.
+
 ## Run
 ```bash
 docker compose up --build

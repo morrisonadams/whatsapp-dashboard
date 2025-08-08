@@ -9,8 +9,18 @@ AFFECTION_TOKENS = [
     "love you","luv u","miss you","😘","❤️","❤","💕","💖",
     "babe","baby","hun","honey","cutie","sweetheart","proud of you"
 ]
-PROFANITY = ["fuck","shit","bitch","asshole","dick","cuck"]
-SEXUAL_WORDS = ["sex","sexy","naked","nude","dick","pussy","boobs","tits","cock","cum","horny"]
+PROFANITY = [
+    "fuck","shit","bitch","ass","asshole","dick","cuck","bastard",
+    "damn","crap","hell","piss","motherfucker","bullshit"
+]
+SEXUAL_WORDS = [
+    "sex","sexy","naked","nude","dick","pussy","boobs","tits","cock","cum",
+    "horny","ass","booty","butt","lingerie","thighs","kinky","seduce"
+]
+SPACE_WORDS = [
+    "space","rocket","planet","star","galaxy","universe","moon",
+    "mars","astronaut","cosmos","nebula","nasa"
+]
 PRONOUNS_WE = ["we","us","our","ours"]
 PRONOUNS_I = ["i","me","my","mine"]
 QUESTION_PAT = re.compile(r"\?\s*$|^\s*(?:who|what|when|where|why|how|can|do|did|are|is|should)\b", re.IGNORECASE)
@@ -42,6 +52,8 @@ def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> D
                     tags[w].add("swear")
                 if w in SEXUAL_WORDS:
                     tags[w].add("sexual")
+                if w in SPACE_WORDS:
+                    tags[w].add("space")
             for e in emoji_tokens:
                 words.append(e)
                 if e not in tags:
