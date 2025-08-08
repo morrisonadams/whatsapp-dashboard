@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any
 from parse import parse_export
 from kpis import to_df, compute
-from conflict import analyze_conflicts_by_month, stream_conflicts
+from conflict import analyze_conflicts, stream_conflicts
 import json
 from dotenv import load_dotenv
 
@@ -32,14 +32,14 @@ class KPIResponse(BaseModel):
     kpis: Dict[str, Any]
 
 
-class ConflictMonth(BaseModel):
-    month: str
+class ConflictPeriod(BaseModel):
+    period: str
     total_conflicts: int
     conflicts: List[Dict[str, str]]
 
 
 class ConflictResponse(BaseModel):
-    months: List[ConflictMonth]
+    periods: List[ConflictPeriod]
 
 @app.post("/upload", response_model=KPIResponse)
 async def upload(file: UploadFile = File(...)):
@@ -75,10 +75,10 @@ async def get_conflicts():
     if STATE["messages_df"] is None:
         raise HTTPException(status_code=404, detail="No upload yet")
     try:
-        months = await analyze_conflicts_by_month(STATE["messages_df"])
+        periods = await analyze_conflicts(STATE["messages_df"])
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
-    return {"months": months}
+    return {"periods": periods}
 
 @app.get("/version")
 def version():
@@ -118,7 +118,7 @@ async def conflicts_stream():
 
     async def event_gen():
         async for current, total, data in stream_conflicts(STATE["messages_df"]):
-            payload = {"current": current, "total": total, "month": data}
+            payload = {"current": current, "total": total, "period": data}
             yield f"data: {json.dumps(payload)}\n\n"
         yield "data: [DONE]\n\n"
 

@@ -21,11 +21,11 @@ export async function getConflicts(
 ) {
   return new Promise<any[]>((resolve, reject) => {
     const es = new EventSource(`${API_BASE}/conflicts_stream`);
-    const months: any[] = [];
+    const periods: any[] = [];
     es.onmessage = (ev) => {
       if (ev.data === "[DONE]") {
         es.close();
-        const sorted = months.sort((a, b) => a.month.localeCompare(b.month));
+        const sorted = periods.sort((a, b) => a.period.localeCompare(b.period));
         resolve(sorted);
         return;
       }
@@ -34,7 +34,7 @@ export async function getConflicts(
         if (msg.current && msg.total && onProgress) {
           onProgress(msg.current, msg.total);
         }
-        if (msg.month) months.push(msg.month);
+        if (msg.period) periods.push(msg.period);
       } catch {
         // ignore malformed messages
       }

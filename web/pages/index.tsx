@@ -51,8 +51,8 @@ export default function Home() {
 
 async function fetchConflicts() {
   try {
-    const m = await getConflicts((current,total)=>setConflictProgress({current,total}));
-    setConflicts(m);
+    const p = await getConflicts((current,total)=>setConflictProgress({current,total}));
+    setConflicts(p);
     setConflictErr(null);
   } catch (e: any) {
     setConflictErr(e?.message || "Failed to load conflicts");
@@ -309,20 +309,20 @@ async function fetchConflicts() {
   };
 
   const conflictBarOption = () => {
-    const months = conflicts.map(m=>m.month);
-    const totals = conflicts.map(m=>m.total_conflicts);
+    const periods = conflicts.map(p=>p.period);
+    const totals = conflicts.map(p=>p.total_conflicts);
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      xAxis: { type: "category", data: periods, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[3] }, barWidth: "40%" }]
     };
   };
 
   const conflictTimelineOption = () => {
-    const pts = conflicts.flatMap(m => (m.conflicts||[]).map((c:any)=>({date:c.date, summary:c.summary})));
+    const pts = conflicts.flatMap(p => (p.conflicts||[]).map((c:any)=>({date:c.date, summary:c.summary})));
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
@@ -452,10 +452,10 @@ async function fetchConflicts() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card title="Conflicts per month">
+              <Card title="Conflicts per period (2 weeks)">
                 {conflictProgress && (
                   <div className="text-sm text-gray-400 mb-2">
-                    Analyzing {conflictProgress.current}/{conflictProgress.total} months...
+                    Analyzing {conflictProgress.current}/{conflictProgress.total} periods...
                   </div>
                 )}
                 <Chart option={conflictBarOption()} />
@@ -470,11 +470,11 @@ async function fetchConflicts() {
             <div className="grid grid-cols-1 gap-6">
               <Card title="Conflict details">
                 {!conflictProgress && conflicts.length === 0 && <div className="text-sm text-gray-400">No conflict data.</div>}
-                {conflicts.map(m => (
-                  <div key={m.month} className="mb-4">
-                    <div className="font-semibold mb-1">{m.month} — {m.total_conflicts}</div>
+                {conflicts.map(p => (
+                  <div key={p.period} className="mb-4">
+                    <div className="font-semibold mb-1">{p.period} — {p.total_conflicts}</div>
                     <ul className="text-sm text-gray-300 list-disc ml-5">
-                      {m.conflicts.map((c:any,i:number)=>(
+                      {p.conflicts.map((c:any,i:number)=>(
                         <li key={i}><span className="font-mono">{c.date}</span>: {c.summary}</li>
                       ))}
                     </ul>
