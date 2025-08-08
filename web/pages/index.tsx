@@ -328,8 +328,8 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: {
         formatter: (p:any) => `${p.data.date}<br/>${p.data.summary}`,
-        confine: true,
-        extraCssText: 'max-width: 240px; white-space: normal; word-break: break-word;'
+        appendToBody: true,
+        extraCssText: 'max-width: 320px; white-space: normal; word-break: break-word; z-index: 1000;'
       },
       xAxis: { type: "time", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { show: false },

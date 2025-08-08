@@ -67,7 +67,7 @@ async def _analyze_period_async(
 
 async def analyze_conflicts(
     df: pd.DataFrame,
-    model: str = "gpt-4.1-mini",
+    model: str = "gpt-5-mini",
     max_concurrency: int = 5,
 ) -> List[Dict[str, Any]]:
     """Analyze conflicts in chat history by two-week periods using an LLM."""
@@ -87,7 +87,7 @@ async def analyze_conflicts(
 
 async def stream_conflicts(
     df: pd.DataFrame,
-    model: str = "gpt-4.1-mini",
+    model: str = "gpt-5-mini",
     max_concurrency: int = 5,
 ) -> AsyncIterator[Tuple[int, int, Dict[str, Any]]]:
     """Yield conflict analysis period by period with progress info."""
