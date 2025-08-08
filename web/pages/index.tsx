@@ -69,6 +69,8 @@ export default function Home() {
   }, [participants]);
 
   const wordCloudParticipants = participants.slice(0, 2);
+  const wordCategories = ["emoji", "swear", "sexual"];
+  const [wordFilters, setWordFilters] = useState<string[]>([]);
 
   const dateFilter = (day: string) => {
     if (startDate && day < startDate) return false;
@@ -292,7 +294,11 @@ export default function Home() {
   };
 
   const wordCloudOption = (person: string) => {
-    const data = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number}>;
+    const raw = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number; tags?:string[]}>;
+    const data = (wordFilters.length
+      ? raw.filter(r => (r.tags || []).some(t => wordFilters.includes(t)))
+      : raw)
+      .slice(0, 50);
     return {
       backgroundColor: "transparent",
       tooltip: {},
@@ -421,6 +427,24 @@ export default function Home() {
 
             <div className="grid grid-cols-1 gap-6">
               <Card title="Word cloud by participant">
+                <div className="mb-2 flex flex-wrap gap-3">
+                  {wordCategories.map(cat => (
+                    <label key={cat} className="text-xs flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={wordFilters.includes(cat)}
+                        onChange={() =>
+                          setWordFilters(prev =>
+                            prev.includes(cat)
+                              ? prev.filter(c => c !== cat)
+                              : [...prev, cat]
+                          )
+                        }
+                      />
+                      {cat}
+                    </label>
+                  ))}
+                </div>
                 {wordCloudParticipants.length === 2 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {wordCloudParticipants.map(p => (

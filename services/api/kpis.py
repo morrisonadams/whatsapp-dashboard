@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
 import re, pandas as pd
 from collections import Counter
 from wordcloud import STOPWORDS as WC_STOPWORDS
@@ -10,6 +10,7 @@ AFFECTION_TOKENS = [
     "babe","baby","hun","honey","cutie","sweetheart","proud of you"
 ]
 PROFANITY = ["fuck","shit","bitch","asshole","dick","cuck"]
+SEXUAL_WORDS = ["sex","sexy","naked","nude","dick","pussy","boobs","tits","cock","cum","horny"]
 PRONOUNS_WE = ["we","us","our","ours"]
 PRONOUNS_I = ["i","me","my","mine"]
 QUESTION_PAT = re.compile(r"\?\s*$|^\s*(?:who|what|when|where|why|how|can|do|did|are|is|should)\b", re.IGNORECASE)
@@ -18,8 +19,8 @@ QUESTION_PAT = re.compile(r"\?\s*$|^\s*(?:who|what|when|where|why|how|can|do|did
 STOPWORDS = set(WC_STOPWORDS)
 STOPWORDS.update({"im", "us", "our", "ours", "your"})
 
-def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> Dict[str, List[Dict[str, int]]]:
-    out: Dict[str, List[Dict[str, int]]] = {}
+def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> Dict[str, List[Dict[str, Any]]]:
+    out: Dict[str, List[Dict[str, Any]]] = {}
     filtered = df[
         df["sender"].isin(participants)
         & (~df["has_media"])
@@ -27,13 +28,39 @@ def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> D
     ]
     for sender, sub in filtered.groupby("sender"):
         words: List[str] = []
+        tags: Dict[str, Set[str]] = {}
         for text in sub["text"].fillna(""):
             tokens = re.findall(r"[A-Za-z']+", text.lower())
             emoji_tokens = [d["emoji"] for d in emoji.emoji_list(text)]
-            words.extend([w for w in tokens if w not in STOPWORDS])
-            words.extend(emoji_tokens)
+            for w in tokens:
+                if w in STOPWORDS:
+                    continue
+                words.append(w)
+                if w not in tags:
+                    tags[w] = set()
+                if w in PROFANITY:
+                    tags[w].add("swear")
+                if w in SEXUAL_WORDS:
+                    tags[w].add("sexual")
+            for e in emoji_tokens:
+                words.append(e)
+                if e not in tags:
+                    tags[e] = set()
+                tags[e].add("emoji")
         cnt = Counter(words)
-        out[str(sender)] = [{"name": w, "value": int(c)} for w, c in cnt.most_common(top_n)]
+        # start with overall top N
+        top_words = {w for w, _ in cnt.most_common(top_n)}
+        # ensure we also include top N for each tag category
+        all_tags = {t for ts in tags.values() for t in ts}
+        for t in all_tags:
+            tagged = [w for w in cnt if t in tags.get(w, set())]
+            top_words.update(
+                [w for w, _ in Counter({w: cnt[w] for w in tagged}).most_common(top_n)]
+            )
+        out[str(sender)] = [
+            {"name": w, "value": int(cnt[w]), "tags": sorted(list(tags.get(w, set())))}
+            for w in sorted(top_words, key=lambda x: cnt[x], reverse=True)
+        ]
     return out
 
 def to_df(messages: List[Message]) -> pd.DataFrame:
