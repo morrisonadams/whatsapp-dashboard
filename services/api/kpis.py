@@ -3,6 +3,7 @@ import re, pandas as pd
 from collections import Counter
 from wordcloud import STOPWORDS as WC_STOPWORDS
 from parse import Message
+import emoji
 
 AFFECTION_TOKENS = [
     "love you","luv u","miss you","😘","❤️","❤","💕","💖",
@@ -28,7 +29,9 @@ def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> D
         words: List[str] = []
         for text in sub["text"].fillna(""):
             tokens = re.findall(r"[A-Za-z']+", text.lower())
+            emoji_tokens = [d["emoji"] for d in emoji.emoji_list(text)]
             words.extend([w for w in tokens if w not in STOPWORDS])
+            words.extend(emoji_tokens)
         cnt = Counter(words)
         out[str(sender)] = [{"name": w, "value": int(c)} for w, c in cnt.most_common(top_n)]
     return out
