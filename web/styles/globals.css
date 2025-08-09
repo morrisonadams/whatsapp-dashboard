@@ -3,5 +3,7 @@
 @tailwind utilities;
 
 body {
-  @apply text-gray-50 font-sans;
+  @apply font-sans;
+  color: var(--text-color);
+  background-color: var(--bg-color);
 }
