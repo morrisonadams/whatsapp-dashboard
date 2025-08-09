@@ -7,11 +7,10 @@ import Chart from "@/components/Chart";
 type KPI = any;
 
 const palette = {
-  bg: "radial-gradient(1200px 600px at 20% 10%, rgba(143,76,255,0.25), transparent 60%), radial-gradient(1000px 600px at 80% 20%, rgba(0,184,255,0.18), transparent 60%), radial-gradient(1000px 600px at 50% 80%, rgba(255,80,150,0.18), transparent 60%), #0b0f17",
-  text: "#e6e8ef",
-  subtext: "#9aa4b2",
-  surfaces: "#0f1521",
-  series: ["#a78bfa", "#22d3ee", "#f59e0b", "#ef4444", "#10b981", "#f472b6"]
+  text: "#e2e8f0",
+  subtext: "#94a3b8",
+  surfaces: "#1e293b",
+  series: ["#7dd3fc", "#c4b5fd", "#f9a8d4", "#fdba74", "#fca5a5", "#bef264"]
 };
 const formatNumber = (n: number) => n.toLocaleString();
 
@@ -389,21 +388,19 @@ async function fetchConflicts() {
   };
 
   return (
-    <div style={{ background: palette.bg }} className="min-h-screen text-white">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">WhatsApp Relationship Analytics - v0.2.9</h1>
-          <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
-            {busy ? "Uploading..." : "Upload .txt"}
-            <input type="file" className="hidden" accept=".txt" onChange={(e)=>e.target.files&&onUpload(e.target.files[0])} />
-          </label>
-        </div>
-        {err && <div className="text-red-400">{err}</div>}
-        {conflictErr && <div className="text-red-400">{conflictErr}</div>}
-        {!kpis && <div className="text-gray-300">Load sample or upload a WhatsApp export.</div>}
-        {kpis && (
-          <>
-            <div className="flex flex-col md:flex-row gap-2 md:items-end">
+    <>
+      <div className="flex items-center justify-end">
+        <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
+          {busy ? "Uploading..." : "Upload chat"}
+          <input type="file" className="hidden" accept=".txt" onChange={(e)=>e.target.files&&onUpload(e.target.files[0])} />
+        </label>
+      </div>
+      {err && <div className="text-red-400">{err}</div>}
+      {conflictErr && <div className="text-red-400">{conflictErr}</div>}
+      {!kpis && <div className="text-gray-300">Load sample or upload a WhatsApp export.</div>}
+      {kpis && (
+        <>
+          <div className="flex flex-col md:flex-row gap-2 md:items-end">
               <div>
                 <label className="text-sm mr-2">Start</label>
                 <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
@@ -567,7 +564,6 @@ async function fetchConflicts() {
           </>
         )}
         <div className="text-xs text-gray-400">v0.2.9 — visual refinements • API v{apiVersion}</div>
-      </div>
-    </div>
+    </>
   );
 }
