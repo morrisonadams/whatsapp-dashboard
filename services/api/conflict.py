@@ -137,14 +137,19 @@ def periods_to_months(periods: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Aggregate two-week period results into calendar months."""
     months: Dict[str, Dict[str, Any]] = {}
     for p in periods:
-        start = pd.Period(p["period"], freq="2W").start_time
-        month_key = f"{start:%Y-%m}"
-        month_entry = months.setdefault(
-            month_key, {"month": month_key, "total_conflicts": 0, "conflicts": []}
-        )
         for c in p.get("conflicts", []):
+            try:
+                dt = pd.to_datetime(c.get("date"))
+            except Exception:
+                continue
+            month_key = dt.strftime("%Y-%m")
+            month_entry = months.setdefault(
+                month_key, {"month": month_key, "total_conflicts": 0, "conflicts": []}
+            )
             month_entry["conflicts"].append(c)
             month_entry["total_conflicts"] += 1
+    for m in months.values():
+        m["conflicts"].sort(key=lambda x: x.get("date", ""))
     # Ensure months are returned in chronological order
     return [months[m] for m in sorted(months)]
 

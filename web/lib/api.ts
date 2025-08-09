@@ -26,15 +26,17 @@ export async function getConflicts(
     const aggregate = (per: any[]) => {
       const months: Record<string, {month: string; total_conflicts: number; conflicts: any[]}> = {};
       for (const p of per) {
-        const start = new Date(p.period.split("/")[0]);
-        const monthKey = start.toISOString().slice(0,7);
-        if (!months[monthKey]) {
-          months[monthKey] = {month: monthKey, total_conflicts: 0, conflicts: []};
-        }
         for (const c of (p.conflicts || [])) {
+          const monthKey = new Date(c.date).toISOString().slice(0,7);
+          if (!months[monthKey]) {
+            months[monthKey] = {month: monthKey, total_conflicts: 0, conflicts: []};
+          }
           months[monthKey].conflicts.push(c);
           months[monthKey].total_conflicts += 1;
         }
+      }
+      for (const m of Object.values(months)) {
+        m.conflicts.sort((a,b)=>a.date.localeCompare(b.date));
       }
       return Object.values(months).sort((a,b)=>a.month.localeCompare(b.month));
     };
