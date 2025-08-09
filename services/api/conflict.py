@@ -24,11 +24,11 @@ def _build_prompt(period: str, df: pd.DataFrame) -> str:
     lines = [f"{row['ts']:%Y-%m-%d}: {row['text']}" for _, row in df.iterrows()]
     return (
         "You are an expert assistant in analyzing chat logs for substantive interpersonal conflicts—"
-        "moments where one or both people experience real misalignment, emotional pain, disappointment, "
+        "moments where both participants clearly experience real misalignment, emotional pain, disappointment, "
         "or confusion (not just playful teasing). "
-        "Return only legitimate, emotionally significant conflicts. Ignore brattiness, playful criticisms, "
-        "and ongoing teasing unless they escalate into real misunderstandings, new boundaries, or feelings of hurt. "
-        "Focus solely on disagreements between the two people in this conversation; disregard conflicts involving third parties unless they create tension between them.\n"
+        "Report only conflicts that are unmistakably significant and involve direct exchanges between the two people. "
+        "Ignore brattiness, playful criticisms, mild misunderstandings, or single-sided complaints unless they escalate into real hurt or new boundaries. "
+        "Disregard any mention of third parties unless it causes tension between the two participants.\n"
         "If there are no significant conflicts in this period, respond with total_conflicts: 0 and an empty conflicts array.\n"
         "Output JSON with:\n"
         "total_conflicts: integer, count of significant or potentially relationship-altering conflicts.\n"
@@ -68,7 +68,7 @@ async def _analyze_period_async(
 
 async def analyze_conflicts(
     df: pd.DataFrame,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-5-nano",
     max_concurrency: int = 5,
 ) -> List[Dict[str, Any]]:
     """Analyze conflicts in chat history by two-week periods using an LLM."""
@@ -104,7 +104,7 @@ def periods_to_months(periods: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 async def stream_conflicts(
     df: pd.DataFrame,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-5-nano",
     max_concurrency: int = 5,
 ) -> AsyncIterator[Tuple[int, int, Dict[str, Any]]]:
     """Yield conflict analysis period by period with progress info."""
