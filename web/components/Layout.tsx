@@ -36,12 +36,18 @@ export default function Layout({ children }: { children: ReactNode }) {
       </Head>
       <div className="min-h-screen relative" style={{ backgroundColor: "var(--bg-color)", color: "var(--text-color)" }}>
         <div
-          className="pointer-events-none fixed inset-0 bg-center bg-cover bg-fixed -z-10 smoke-animation"
+          className="pointer-events-none fixed inset-0 -z-10"
           style={{
-            backgroundImage: "url('/smoke.svg')",
             backgroundColor: "var(--main-color)",
-            mixBlendMode: "multiply",
-            opacity: 0.15,
+            maskImage: "url('/smoke.svg')",
+            WebkitMaskImage: "url('/smoke.svg')",
+            maskSize: "cover",
+            WebkitMaskSize: "cover",
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            maskPosition: "center",
+            WebkitMaskPosition: "center",
+            opacity: 0.2,
           }}
         ></div>
         <header
