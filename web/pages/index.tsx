@@ -360,8 +360,8 @@ async function fetchConflicts() {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      yAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       xAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[3] }, barWidth: "60%" }],
       grid: { left: 80, right: 20, top: 20, bottom: 40 }
     };
@@ -509,32 +509,34 @@ async function fetchConflicts() {
             </Card>
           </section>
 
-          <section id="conflicts" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card title="Conflicts per month">
-              {conflictProgress && (
-                <div className="text-sm text-gray-400 mb-2">
-                  Analyzing {conflictProgress.current}/{conflictProgress.total} segments...
-                </div>
-              )}
-              <Chart option={conflictBarOption()} height={260} onEvents={{ click: onConflictBarClick }} />
-              {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
-            </Card>
+          <section id="conflicts" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card title="Conflicts per month">
+                {conflictProgress && (
+                  <div className="text-sm text-gray-400 mb-2">
+                    Analyzing {conflictProgress.current}/{conflictProgress.total} segments...
+                  </div>
+                )}
+                <Chart option={conflictBarOption()} height={260} onEvents={{ click: onConflictBarClick }} />
+                {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
+              </Card>
+              <Card title={selectedConflict ? `Conflicts in ${selectedConflict.month}` : "Conflict details"}>
+                {selectedConflict ? (
+                  <ul className="text-sm text-gray-300 list-disc ml-5">
+                    {selectedConflict.conflicts.map((c:any,i:number)=>(
+                      <li key={i}><span className="font-mono">{c.date}</span>: {c.summary}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-400">
+                    {conflictProgress ? "Analyzing conflicts..." : conflicts.length === 0 ? "No conflict data." : "Select a month bar to view details."}
+                  </div>
+                )}
+              </Card>
+            </div>
             <Card title="Conflict timeline">
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
-            </Card>
-            <Card title={selectedConflict ? `Conflicts in ${selectedConflict.month}` : "Conflict details"}>
-              {selectedConflict ? (
-                <ul className="text-sm text-gray-300 list-disc ml-5">
-                  {selectedConflict.conflicts.map((c:any,i:number)=>(
-                    <li key={i}><span className="font-mono">{c.date}</span>: {c.summary}</li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="text-sm text-gray-400">
-                  {conflictProgress ? "Analyzing conflicts..." : conflicts.length === 0 ? "No conflict data." : "Select a month bar to view details."}
-                </div>
-              )}
             </Card>
           </section>
 
