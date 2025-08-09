@@ -1,6 +1,10 @@
 import Head from "next/head";
+
 import { ReactNode, useEffect, useState } from "react";
 import { MONKEYTYPE_THEMES } from "@/lib/monkeytypeThemes";
+import { ReactNode } from "react";
+import Sidebar from "@/components/Sidebar";
+
 
 export default function Layout({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState("gruvbox_dark");
