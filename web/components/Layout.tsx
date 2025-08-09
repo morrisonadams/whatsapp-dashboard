@@ -26,6 +26,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     }
     link.href = href;
     localStorage.setItem("theme", theme);
+    window.dispatchEvent(new Event("themechange"));
   }, [theme]);
 
   return (
@@ -33,7 +34,16 @@ export default function Layout({ children }: { children: ReactNode }) {
       <Head>
         <title>WhatsApp Relationship Analytics</title>
       </Head>
-      <div className="min-h-screen" style={{ backgroundColor: "var(--bg-color)", color: "var(--text-color)" }}>
+      <div className="min-h-screen relative" style={{ backgroundColor: "var(--bg-color)", color: "var(--text-color)" }}>
+        <div
+          className="pointer-events-none fixed inset-0 bg-center bg-cover bg-fixed -z-10"
+          style={{
+            backgroundImage: "url('/smoke.svg')",
+            backgroundColor: "var(--main-color)",
+            mixBlendMode: "multiply",
+            opacity: 0.15,
+          }}
+        ></div>
         <header
           className="border-b"
           style={{ backgroundColor: "var(--sub-alt-color)", borderColor: "var(--sub-color)" }}
