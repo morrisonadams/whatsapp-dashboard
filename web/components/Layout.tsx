@@ -1,8 +1,10 @@
 import Head from "next/head";
 
 import { ReactNode, useEffect, useState } from "react";
-import { MONKEYTYPE_THEMES } from "@/lib/monkeytypeThemes";
+
+import { VIM_THEME_NAMES, VIM_THEMES } from "@/lib/vimThemes";
 import Sidebar from "@/components/Sidebar";
+
 
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -11,21 +13,18 @@ export default function Layout({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem("theme");
-    if (saved) setTheme(saved);
+    if (saved && VIM_THEMES[saved]) setTheme(saved);
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const linkId = "theme-style";
-    const href = `https://cdn.jsdelivr.net/gh/monkeytypegame/monkeytype/frontend/static/themes/${theme}.css`;
-    let link = document.getElementById(linkId) as HTMLLinkElement | null;
-    if (!link) {
-      link = document.createElement("link");
-      link.id = linkId;
-      link.rel = "stylesheet";
-      document.head.appendChild(link);
-    }
-    link.href = href;
+    const t = VIM_THEMES[theme];
+    const root = document.documentElement.style;
+    root.setProperty("--bg-color", t.bg);
+    root.setProperty("--text-color", t.text);
+    root.setProperty("--sub-color", t.subtext);
+    root.setProperty("--sub-alt-color", t.surfaces);
+    root.setProperty("--main-color", t.main);
     localStorage.setItem("theme", theme);
     window.dispatchEvent(new Event("themechange"));
   }, [theme]);
@@ -37,7 +36,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </Head>
       <div className="min-h-screen relative" style={{ backgroundColor: "var(--bg-color)", color: "var(--text-color)" }}>
         <div
-          className="pointer-events-none fixed inset-0 bg-center bg-cover bg-fixed -z-10"
+          className="pointer-events-none fixed inset-0 bg-center bg-cover bg-fixed -z-10 smoke-animation"
           style={{
             backgroundImage: "url('/smoke.svg')",
             backgroundColor: "var(--main-color)",
@@ -63,7 +62,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 border: "1px solid var(--sub-color)",
               }}
             >
-              {MONKEYTYPE_THEMES.map((t) => (
+              {VIM_THEME_NAMES.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
