@@ -1,10 +1,40 @@
 import asyncio
+import hashlib
 import json
 import os
+from pathlib import Path
 from typing import Any, AsyncIterator, Dict, List, Tuple
 
 import pandas as pd
 from openai import AsyncOpenAI
+
+
+CACHE_FILE = Path(__file__).with_name("conflict_cache.json")
+_CACHE: Dict[str, Any] = {}
+
+
+def _load_cache() -> None:
+    """Load cache from disk if available."""
+    global _CACHE
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            _CACHE = json.load(f)
+    except FileNotFoundError:
+        _CACHE = {}
+
+
+def _save_cache() -> None:
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(_CACHE, f)
+
+
+def _hash_period(df: pd.DataFrame) -> str:
+    lines = [f"{row['ts']:%Y-%m-%d}: {row['text']}" for _, row in df.iterrows()]
+    text = "\n".join(lines)
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+_load_cache()
 
 
 def _fortnight_groups(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
@@ -66,6 +96,23 @@ async def _analyze_period_async(
     return data
 
 
+async def _analyze_with_cache(
+    period: str,
+    df: pd.DataFrame,
+    client: AsyncOpenAI,
+    model: str,
+    sem: asyncio.Semaphore,
+) -> Dict[str, Any]:
+    """Check cache before analyzing a period."""
+    key = _hash_period(df)
+    if key in _CACHE:
+        return _CACHE[key]
+    data = await _analyze_period_async(period, df, client, model, sem)
+    _CACHE[key] = data
+    _save_cache()
+    return data
+
+
 async def analyze_conflicts(
     df: pd.DataFrame,
     model: str = "gpt-5-nano",
@@ -79,7 +126,7 @@ async def analyze_conflicts(
     groups = _fortnight_groups(df)
     sem = asyncio.Semaphore(max_concurrency)
     tasks = [
-        _analyze_period_async(period, sub, client, model, sem)
+        _analyze_with_cache(period, sub, client, model, sem)
         for period, sub in groups.items()
     ]
     results = await asyncio.gather(*tasks)
@@ -115,7 +162,7 @@ async def stream_conflicts(
     groups = _fortnight_groups(df)
     sem = asyncio.Semaphore(max_concurrency)
     tasks = [
-        asyncio.create_task(_analyze_period_async(period, sub, client, model, sem))
+        asyncio.create_task(_analyze_with_cache(period, sub, client, model, sem))
         for period, sub in groups.items()
     ]
     total = len(tasks)

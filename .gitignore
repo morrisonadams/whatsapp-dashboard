@@ -20,6 +20,9 @@ coverage/
 *.log
 *.sqlite3
 
+# Cache files
+services/api/conflict_cache.json
+
 # OS / Editors
 .DS_Store
 Thumbs.db
