@@ -400,7 +400,8 @@ async function fetchConflicts() {
       {!kpis && <div className="text-gray-300">Load sample or upload a WhatsApp export.</div>}
       {kpis && (
         <>
-          <div className="flex flex-col md:flex-row gap-2 md:items-end">
+          <section id="overview" className="space-y-4">
+            <div className="flex flex-col md:flex-row gap-2 md:items-end">
               <div>
                 <label className="text-sm mr-2">Start</label>
                 <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
@@ -424,38 +425,37 @@ async function fetchConflicts() {
                 <div className="text-2xl font-bold">{kpis.profanity_hits}</div>
               </Card>
             </div>
+          </section>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card title="Messages by sender">
-                <Chart option={messagesOption()} />
-              </Card>
-              <Card title="Words by sender">
-                <Chart option={wordsOption()} />
-              </Card>
-            </div>
+          <section id="participation" className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card title="Messages by sender">
+              <Chart option={messagesOption()} />
+            </Card>
+            <Card title="Words by sender">
+              <Chart option={wordsOption()} />
+            </Card>
+            <Card title="Seconds to reply">
+              <Chart option={replyOption()} />
+              {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+            </Card>
+          </section>
 
-            <div className="grid grid-cols-1 gap-6">
-              <Card title="Seconds to reply">
-                <Chart option={replyOption()} />
-                {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
-              </Card>
-            </div>
+          <section id="timeline" className="grid grid-cols-1 gap-6">
+            <Card title="Timeline">
+              <div className="flex gap-2 mb-2 items-center">
+                <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
+                <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
+                <label className="flex items-center text-sm ml-auto">
+                  <input type="checkbox" className="mr-1" checked={showTrend} onChange={e=>setShowTrend(e.target.checked)} />
+                  Trend
+                </label>
+              </div>
+              <Chart option={timelineOption()} height={280} onEvents={{ datazoom: handleZoom }} />
+              {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+            </Card>
+          </section>
 
-            <div className="grid grid-cols-1 gap-6">
-              <Card title="Timeline">
-                <div className="flex gap-2 mb-2 items-center">
-                  <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
-                  <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
-                  <label className="flex items-center text-sm ml-auto">
-                    <input type="checkbox" className="mr-1" checked={showTrend} onChange={e=>setShowTrend(e.target.checked)} />
-                    Trend
-                  </label>
-                </div>
-                <Chart option={timelineOption()} height={280} onEvents={{ datazoom: handleZoom }} />
-                {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
-              </Card>
-            </div>
-
+          <section id="conflicts" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card title="Conflicts per month">
                 {conflictProgress && (
@@ -487,80 +487,81 @@ async function fetchConflicts() {
                 ))}
               </Card>
             </div>
+          </section>
 
-            <div className="grid grid-cols-1 gap-6">
-              <Card title="Daily rhythm heatmap (weekday × hour)">
-                <div className="flex gap-2 mb-2">
-                  <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
-                  {participants.map(p => (
-                    <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
+          <section id="heatmap" className="grid grid-cols-1 gap-6">
+            <Card title="Daily rhythm heatmap (weekday × hour)">
+              <div className="flex gap-2 mb-2">
+                <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
+                {participants.map(p => (
+                  <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
+                ))}
+              </div>
+              <Chart option={heatOption()} height={320} />
+            </Card>
+          </section>
+
+          <section id="wordcloud" className="grid grid-cols-1 gap-6">
+            <Card title="Word cloud by participant">
+              <div className="mb-2 flex flex-wrap gap-3">
+                {wordCategories.map(cat => (
+                  <label key={cat} className="text-xs flex items-center gap-1">
+                    <input
+                      type="checkbox"
+                      checked={wordFilters.includes(cat)}
+                      onChange={() =>
+                        setWordFilters(prev =>
+                          prev.includes(cat)
+                            ? prev.filter(c => c !== cat)
+                            : [...prev, cat]
+                        )
+                      }
+                    />
+                    {cat}
+                  </label>
+                ))}
+              </div>
+              {wordCloudParticipants.length === 2 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {wordCloudParticipants.map(p => (
+                    <div key={p}>
+                      <div className="text-center mb-1 font-semibold">{p}</div>
+                      <Chart option={wordCloudOption(p)} height={260} />
+                    </div>
                   ))}
                 </div>
-                <Chart option={heatOption()} height={320} />
-              </Card>
-            </div>
+              ) : (
+                <div className="text-sm text-gray-400">Need two participants for word clouds.</div>
+              )}
+            </Card>
+          </section>
 
-            <div className="grid grid-cols-1 gap-6">
-              <Card title="Word cloud by participant">
-                <div className="mb-2 flex flex-wrap gap-3">
-                  {wordCategories.map(cat => (
-                    <label key={cat} className="text-xs flex items-center gap-1">
-                      <input
-                        type="checkbox"
-                        checked={wordFilters.includes(cat)}
-                        onChange={() =>
-                          setWordFilters(prev =>
-                            prev.includes(cat)
-                              ? prev.filter(c => c !== cat)
-                              : [...prev, cat]
-                          )
-                        }
-                      />
-                      {cat}
-                    </label>
-                  ))}
-                </div>
-                {wordCloudParticipants.length === 2 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {wordCloudParticipants.map(p => (
-                      <div key={p}>
-                        <div className="text-center mb-1 font-semibold">{p}</div>
-                        <Chart option={wordCloudOption(p)} height={260} />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-400">Need two participants for word clouds.</div>
-                )}
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card
-                title="Questions (total & per person)"
-                tooltip="Questions are messages that end with a '?' or start with words like 'who' or 'why'. Marked as unanswered if no one else replies within 15 minutes."
-              >
-                <div className="text-3xl">{kpis.questions.total}</div>
-                <div className="text-sm text-gray-300">Unanswered within 15m: {kpis.questions.unanswered_15m}</div>
-                {cardSplit("questions")}
-                <div className="mt-1 text-sm text-gray-300">Unanswered per person:</div>
-                {cardSplit("unanswered")}
-              </Card>
-              <Card
-                title="Attachments (total & per person)"
-                tooltip="Counts messages that include media or file attachments such as photos, videos, audio, or documents."
-              >
-                <div className="text-3xl">{kpis.media_total}</div>
-                {cardSplit("attachments")}
-              </Card>
-              <Card
-                title="Affection markers (total & per person)"
-                tooltip="Messages containing affectionate words or emojis like 'love you', '😘', or '❤️'."
-              >
-                <div className="text-3xl">{kpis.affection_hits}</div>
-                {cardSplit("affection")}
-              </Card>
-            </div>
+          <section id="extras" className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card
+              title="Questions (total & per person)"
+              tooltip="Questions are messages that end with a '?' or start with words like 'who' or 'why'. Marked as unanswered if no one else replies within 15 minutes."
+            >
+              <div className="text-3xl">{kpis.questions.total}</div>
+              <div className="text-sm text-gray-300">Unanswered within 15m: {kpis.questions.unanswered_15m}</div>
+              {cardSplit("questions")}
+              <div className="mt-1 text-sm text-gray-300">Unanswered per person:</div>
+              {cardSplit("unanswered")}
+            </Card>
+            <Card
+              title="Attachments (total & per person)"
+              tooltip="Counts messages that include media or file attachments such as photos, videos, audio, or documents."
+            >
+              <div className="text-3xl">{kpis.media_total}</div>
+              {cardSplit("attachments")}
+            </Card>
+            <Card
+              title="Affection markers (total & per person)"
+              tooltip="Messages containing affectionate words or emojis like 'love you', '😘', or '❤️'."
+            >
+              <div className="text-3xl">{kpis.affection_hits}</div>
+              {cardSplit("affection")}
+            </Card>
+          </section>
           </>
         )}
         <div className="text-xs text-gray-400">v0.2.9 — visual refinements • API v{apiVersion}</div>
