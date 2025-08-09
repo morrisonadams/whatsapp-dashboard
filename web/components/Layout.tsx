@@ -12,11 +12,11 @@ export default function Layout({ children }: { children: ReactNode }) {
         <Sidebar />
         <div className="flex-1 flex flex-col">
           <header className="border-b border-white/10 bg-white/5 backdrop-blur">
-            <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="px-6 py-4">
               <h1 className="text-2xl font-semibold">WhatsApp Relationship Analytics</h1>
             </div>
           </header>
-          <main className="max-w-7xl mx-auto p-6 space-y-6">
+          <main className="flex-1 p-6 space-y-6">
             {children}
           </main>
         </div>

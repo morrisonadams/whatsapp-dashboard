@@ -22,6 +22,7 @@ export default function Home() {
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
+  const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
   const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
@@ -52,6 +53,7 @@ async function fetchConflicts() {
   try {
     const p = await getConflicts((current,total)=>setConflictProgress({current,total}));
     setConflicts(p);
+    setSelectedConflict(null);
     setConflictErr(null);
   } catch (e: any) {
     setConflictErr(e?.message || "Failed to load conflicts");
@@ -180,6 +182,49 @@ async function fetchConflicts() {
             return { value: row.seconds || 0, itemStyle: { color: colorMap[p] } };
           }),
           barWidth: "40%"
+        }
+      ]
+    };
+  };
+
+  const wordsPerMessageOption = () => {
+    const rows = filteredBySender.map(r => ({
+      sender: r.sender,
+      messages: r.messages,
+      words: r.words,
+      wpm: r.messages ? r.words / r.messages : 0
+    }));
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: {
+        formatter: (p: any) => `${p.data.sender}<br/>Messages: ${formatNumber(p.data.messages)}<br/>Words: ${formatNumber(p.data.words)}<br/>Words/msg: ${p.data.wpm.toFixed(2)}`
+      },
+      xAxis: {
+        type: "value",
+        name: "Messages",
+        axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
+        axisLine: { lineStyle: { color: palette.subtext } }
+      },
+      yAxis: {
+        type: "value",
+        name: "Words",
+        axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
+        axisLine: { lineStyle: { color: palette.subtext } }
+      },
+      series: [
+        {
+          type: "scatter",
+          data: rows.map(r => ({
+            value: [r.messages, r.words],
+            sender: r.sender,
+            messages: r.messages,
+            words: r.words,
+            wpm: r.wpm,
+            symbolSize: Math.max(20, Math.min(80, r.wpm * 5)),
+            itemStyle: { color: colorMap[r.sender] }
+          })),
+          label: { show: true, formatter: (p:any) => p.data.sender, color: palette.text }
         }
       ]
     };
@@ -315,10 +360,16 @@ async function fetchConflicts() {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[3] }, barWidth: "40%" }]
+      yAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      xAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[3] }, barWidth: "60%" }],
+      grid: { left: 80, right: 20, top: 20, bottom: 40 }
     };
+  };
+
+  const onConflictBarClick = (p:any) => {
+    const month = p.name;
+    setSelectedConflict(conflicts.find(c => c.month === month) || null);
   };
 
   const conflictTimelineOption = () => {
@@ -427,12 +478,15 @@ async function fetchConflicts() {
             </div>
           </section>
 
-          <section id="participation" className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <section id="participation" className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <Card title="Messages by sender">
               <Chart option={messagesOption()} />
             </Card>
             <Card title="Words by sender">
               <Chart option={wordsOption()} />
+            </Card>
+            <Card title="Words per message">
+              <Chart option={wordsPerMessageOption()} />
             </Card>
             <Card title="Seconds to reply">
               <Chart option={replyOption()} />
@@ -455,38 +509,33 @@ async function fetchConflicts() {
             </Card>
           </section>
 
-          <section id="conflicts" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card title="Conflicts per month">
-                {conflictProgress && (
-                  <div className="text-sm text-gray-400 mb-2">
-                    Analyzing {conflictProgress.current}/{conflictProgress.total} segments...
-                  </div>
-                )}
-                <Chart option={conflictBarOption()} />
-                {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
-              </Card>
-              <Card title="Conflict timeline">
-                <Chart option={conflictTimelineOption()} height={200} />
-                {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
-              </Card>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6">
-              <Card title="Conflict details">
-                {!conflictProgress && conflicts.length === 0 && <div className="text-sm text-gray-400">No conflict data.</div>}
-                {conflicts.map(p => (
-                  <div key={p.month} className="mb-4">
-                    <div className="font-semibold mb-1">{p.month} — {p.total_conflicts}</div>
-                    <ul className="text-sm text-gray-300 list-disc ml-5">
-                      {p.conflicts.map((c:any,i:number)=>(
-                        <li key={i}><span className="font-mono">{c.date}</span>: {c.summary}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </Card>
-            </div>
+          <section id="conflicts" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card title="Conflicts per month">
+              {conflictProgress && (
+                <div className="text-sm text-gray-400 mb-2">
+                  Analyzing {conflictProgress.current}/{conflictProgress.total} segments...
+                </div>
+              )}
+              <Chart option={conflictBarOption()} height={260} onEvents={{ click: onConflictBarClick }} />
+              {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
+            </Card>
+            <Card title="Conflict timeline">
+              <Chart option={conflictTimelineOption()} height={200} />
+              {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
+            </Card>
+            <Card title={selectedConflict ? `Conflicts in ${selectedConflict.month}` : "Conflict details"}>
+              {selectedConflict ? (
+                <ul className="text-sm text-gray-300 list-disc ml-5">
+                  {selectedConflict.conflicts.map((c:any,i:number)=>(
+                    <li key={i}><span className="font-mono">{c.date}</span>: {c.summary}</li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-sm text-gray-400">
+                  {conflictProgress ? "Analyzing conflicts..." : conflicts.length === 0 ? "No conflict data." : "Select a month bar to view details."}
+                </div>
+              )}
+            </Card>
           </section>
 
           <section id="heatmap" className="grid grid-cols-1 gap-6">
