@@ -3,7 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Tuple
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 import pandas as pd
 from openai import AsyncOpenAI
@@ -11,6 +11,14 @@ from openai import AsyncOpenAI
 
 CACHE_FILE = Path(__file__).with_name("conflict_cache.json")
 _CACHE: Dict[str, Any] = {}
+
+# Default concurrency can be tuned via the ``CONFLICT_MAX_CONCURRENCY``
+# environment variable. Falling back to the CPU count (or 10 if that cannot
+# be determined) provides good parallelism without overwhelming the API. Higher
+# values speed up processing but may hit rate limits or increase memory usage.
+DEFAULT_MAX_CONCURRENCY = max(
+    1, int(os.getenv("CONFLICT_MAX_CONCURRENCY", 0)) or (os.cpu_count() or 10)
+)
 
 
 def _load_cache() -> None:
@@ -116,14 +124,26 @@ async def _analyze_with_cache(
 async def analyze_conflicts(
     df: pd.DataFrame,
     model: str = "gpt-5-nano",
-    max_concurrency: int = 5,
+    max_concurrency: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
-    """Analyze conflicts in chat history by two-week periods using an LLM."""
+    """Analyze conflicts in chat history by two-week periods using an LLM.
+
+    Parameters
+    ----------
+    max_concurrency: Optional[int]
+        Maximum number of concurrent API requests. If ``None`` (default), the
+        value from the ``CONFLICT_MAX_CONCURRENCY`` environment variable is
+        used, falling back to the number of CPUs on the machine. Higher values
+        complete analysis faster but may hit API rate limits or use more
+        memory; lower values are safer but slower.
+    """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY not set")
     client = AsyncOpenAI(api_key=api_key)
     groups = _fortnight_groups(df)
+    if max_concurrency is None:
+        max_concurrency = DEFAULT_MAX_CONCURRENCY
     sem = asyncio.Semaphore(max_concurrency)
     tasks = [
         _analyze_with_cache(period, sub, client, model, sem)
@@ -157,14 +177,20 @@ def periods_to_months(periods: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 async def stream_conflicts(
     df: pd.DataFrame,
     model: str = "gpt-5-nano",
-    max_concurrency: int = 5,
+    max_concurrency: Optional[int] = None,
 ) -> AsyncIterator[Tuple[int, int, Dict[str, Any]]]:
-    """Yield conflict analysis period by period with progress info."""
+    """Yield conflict analysis period by period with progress info.
+
+    See :func:`analyze_conflicts` for discussion of the ``max_concurrency``
+    parameter and trade-offs between speed and resource usage.
+    """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY not set")
     client = AsyncOpenAI(api_key=api_key)
     groups = _fortnight_groups(df)
+    if max_concurrency is None:
+        max_concurrency = DEFAULT_MAX_CONCURRENCY
     sem = asyncio.Semaphore(max_concurrency)
     tasks = [
         asyncio.create_task(_analyze_with_cache(period, sub, client, model, sem))

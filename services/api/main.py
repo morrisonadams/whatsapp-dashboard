@@ -7,12 +7,15 @@ from parse import parse_export
 from kpis import to_df, compute
 from conflict import analyze_conflicts, stream_conflicts, periods_to_months
 import json
+import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 API_VERSION = "0.2.9"
 app = FastAPI(title="WhatsApp Relationship Analytics API", version="0.2.9")
+
+MAX_CONCURRENCY = int(os.getenv("CONFLICT_MAX_CONCURRENCY", 0)) or (os.cpu_count() or 10)
 
 # Dev CORS
 app.add_middleware(
@@ -75,7 +78,9 @@ async def get_conflicts():
     if STATE["messages_df"] is None:
         raise HTTPException(status_code=404, detail="No upload yet")
     try:
-        periods = await analyze_conflicts(STATE["messages_df"])
+        periods = await analyze_conflicts(
+            STATE["messages_df"], max_concurrency=MAX_CONCURRENCY
+        )
         months = periods_to_months(periods)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
@@ -118,7 +123,9 @@ async def conflicts_stream():
         raise HTTPException(status_code=404, detail="No upload yet")
 
     async def event_gen():
-        async for current, total, data in stream_conflicts(STATE["messages_df"]):
+        async for current, total, data in stream_conflicts(
+            STATE["messages_df"], max_concurrency=MAX_CONCURRENCY
+        ):
             payload = {"current": current, "total": total, "period": data}
             yield f"data: {json.dumps(payload)}\n\n"
         yield "data: [DONE]\n\n"
