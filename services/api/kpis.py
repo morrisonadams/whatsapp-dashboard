@@ -93,13 +93,29 @@ def to_df(messages: List[Message]) -> pd.DataFrame:
     return df
 
 def reply_pairs(df: pd.DataFrame) -> pd.DataFrame:
-    """Adjacent-only pairing: reply is the next message if it's from the other sender."""
+    """Run-based pairing: for each streak of messages from the same sender,
+    pair the *first* message in that streak with the next message from a
+    different sender. This ensures response time measures from the start of
+    a message run rather than the last message before a reply."""
+    if len(df) == 0:
+        return pd.DataFrame()
+
+    # Ignore rows without a sender to avoid creating spurious runs
+    d = df[df["sender"].astype(bool)].reset_index(drop=True)
+
+    # Identify the first message of each run where the sender changes
+    run_starts = d[d["sender"].ne(d["sender"].shift())].reset_index(drop=True)
+
     pairs = []
-    for idx in range(len(df) - 1):
-        cur = df.iloc[idx]
-        nxt = df.iloc[idx + 1]
-        if cur["sender"] and nxt["sender"] and cur["sender"] != nxt["sender"]:
-            pairs.append({"from": cur["sender"], "to": nxt["sender"], "sec": (nxt["ts"] - cur["ts"]).total_seconds()})
+    for idx in range(len(run_starts) - 1):
+        cur = run_starts.iloc[idx]
+        nxt = run_starts.iloc[idx + 1]
+        if cur["sender"] != nxt["sender"]:
+            pairs.append({
+                "from": cur["sender"],
+                "to": nxt["sender"],
+                "sec": (nxt["ts"] - cur["ts"]).total_seconds(),
+            })
     return pd.DataFrame(pairs)
 
 def reply_pairs_general(df: pd.DataFrame) -> pd.DataFrame:
@@ -184,7 +200,7 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "words": int(by_sender_df["words"].sum()) if len(by_sender_df)>0 else 0
     }
 
-    # Reply stats (adjacent messages by different senders)
+    # Reply stats (first message in each run versus next sender)
     rp = reply_pairs(d)
     reply_simple = []
     if not rp.empty:
