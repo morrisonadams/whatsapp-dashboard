@@ -2,23 +2,23 @@ import Head from "next/head";
 
 import { ReactNode, useEffect, useState } from "react";
 
-import { VIM_THEME_NAMES, VIM_THEMES } from "@/lib/vimThemes";
+import { KEYCAP_THEME_NAMES, KEYCAP_THEMES } from "@/lib/keycapThemes";
 import Sidebar from "@/components/Sidebar";
 
 
 
 export default function Layout({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState("gruvbox_dark");
+  const [theme, setTheme] = useState(KEYCAP_THEME_NAMES[0]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const saved = localStorage.getItem("theme");
-    if (saved && VIM_THEMES[saved]) setTheme(saved);
+    if (saved && KEYCAP_THEMES[saved]) setTheme(saved);
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const t = VIM_THEMES[theme];
+    const t = KEYCAP_THEMES[theme];
     const root = document.documentElement.style;
     root.setProperty("--bg-color", t.bg);
     root.setProperty("--text-color", t.text);
@@ -62,7 +62,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 border: "1px solid var(--sub-color)",
               }}
             >
-              {VIM_THEME_NAMES.map((t) => (
+              {KEYCAP_THEME_NAMES.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
