@@ -3,15 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
+import useThemePalette from "@/lib/useThemePalette";
 
 type KPI = any;
-
-const palette = {
-  text: "#e2e8f0",
-  subtext: "#94a3b8",
-  surfaces: "#1e293b",
-  series: ["#7dd3fc", "#c4b5fd", "#f9a8d4", "#fdba74", "#fca5a5", "#bef264"]
-};
 const formatNumber = (n: number) => n.toLocaleString();
 
 export default function Home() {
@@ -29,6 +23,7 @@ export default function Home() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
+  const palette = useThemePalette();
 
   useEffect(() => {
     fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version")
@@ -83,7 +78,7 @@ async function fetchConflicts() {
       map[p] = palette.series[i % palette.series.length];
     });
     return map;
-  }, [participants]);
+  }, [participants, palette]);
 
   const wordCloudParticipants = participants.slice(0, 2);
   const wordCategories = ["emoji", "swear", "sexual", "space"];
