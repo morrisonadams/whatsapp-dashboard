@@ -473,35 +473,42 @@ async function fetchConflicts() {
             </div>
           </section>
 
-          <section id="participation" className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card title="Messages by sender">
-              <Chart option={messagesOption()} />
-            </Card>
-            <Card title="Words by sender">
-              <Chart option={wordsOption()} />
-            </Card>
-            <Card title="Words per message">
-              <Chart option={wordsPerMessageOption()} />
-            </Card>
-            <Card title="Seconds to reply">
-              <Chart option={replyOption()} />
-              {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
-            </Card>
-          </section>
-
-          <section id="timeline" className="grid grid-cols-1 gap-6">
-            <Card title="Timeline">
-              <div className="flex gap-2 mb-2 items-center">
-                <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
-                <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
-                <label className="flex items-center text-sm ml-auto">
-                  <input type="checkbox" className="mr-1" checked={showTrend} onChange={e=>setShowTrend(e.target.checked)} />
-                  Trend
-                </label>
-              </div>
-              <Chart option={timelineOption()} height={280} onEvents={{ datazoom: handleZoom }} />
-              {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
-            </Card>
+          <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div>
+              <Card title="Messages by sender">
+                <Chart option={messagesOption()} height={260} />
+              </Card>
+            </div>
+            <div>
+              <Card title="Words by sender">
+                <Chart option={wordsOption()} height={260} />
+              </Card>
+            </div>
+            <div className="xl:row-span-2">
+              <Card title="Timeline">
+                <div className="flex gap-2 mb-2 items-center">
+                  <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
+                  <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
+                  <label className="flex items-center text-sm ml-auto">
+                    <input type="checkbox" className="mr-1" checked={showTrend} onChange={e=>setShowTrend(e.target.checked)} />
+                    Trend
+                  </label>
+                </div>
+                <Chart option={timelineOption()} height={360} onEvents={{ datazoom: handleZoom }} />
+                {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+              </Card>
+            </div>
+            <div>
+              <Card title="Words per message">
+                <Chart option={wordsPerMessageOption()} height={260} />
+              </Card>
+            </div>
+            <div>
+              <Card title="Seconds to reply">
+                <Chart option={replyOption()} height={260} />
+                {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+              </Card>
+            </div>
           </section>
 
           <section id="conflicts" className="space-y-6">
@@ -543,7 +550,7 @@ async function fetchConflicts() {
                   <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
                 ))}
               </div>
-              <Chart option={heatOption()} height={320} />
+              <Chart option={heatOption()} height={360} />
             </Card>
           </section>
 

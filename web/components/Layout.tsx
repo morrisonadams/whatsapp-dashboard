@@ -1,7 +1,10 @@
 import Head from "next/head";
 
 import { ReactNode, useEffect, useState } from "react";
+
 import { VIM_THEME_NAMES, VIM_THEMES } from "@/lib/vimThemes";
+import Sidebar from "@/components/Sidebar";
+
 
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -45,7 +48,7 @@ export default function Layout({ children }: { children: ReactNode }) {
           className="border-b"
           style={{ backgroundColor: "var(--sub-alt-color)", borderColor: "var(--sub-color)" }}
         >
-          <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between">
             <h1 className="text-2xl font-semibold" style={{ color: "var(--main-color)" }}>
               WhatsApp Relationship Analytics
             </h1>
@@ -67,9 +70,12 @@ export default function Layout({ children }: { children: ReactNode }) {
             </select>
           </div>
         </header>
-        <main className="max-w-7xl mx-auto p-6 space-y-6">
-          {children}
-        </main>
+        <div className="flex">
+          <Sidebar />
+          <main className="flex-1 p-6 space-y-6">
+            {children}
+          </main>
+        </div>
       </div>
     </>
   );
