@@ -6,6 +6,10 @@ npm-debug.log*
 yarn.lock
 pnpm-lock.yaml
 
+# Web-specific artifacts
+web/package-lock.json
+web/cache/
+
 # Python
 __pycache__/
 *.pyc
