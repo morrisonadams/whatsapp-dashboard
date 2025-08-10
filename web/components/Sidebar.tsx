@@ -2,7 +2,7 @@ const sections = [
   { id: 'overview', label: 'Overview' },
   { id: 'participation', label: 'Participation' },
   { id: 'timeline', label: 'Timeline' },
-  { id: 'conflicts', label: 'Conflicts' },
+  { id: 'moments', label: 'Moments' },
   { id: 'heatmap', label: 'Heatmap' },
   { id: 'wordcloud', label: 'Word Cloud' },
   { id: 'extras', label: 'Extras' }
