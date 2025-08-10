@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useState } from "react";
 
 import { KEYCAP_THEME_NAMES, KEYCAP_THEMES } from "@/lib/keycapThemes";
 import Sidebar from "@/components/Sidebar";
+import SmokeyBackground from "@/components/SmokeyBackground";
 
 
 
@@ -35,23 +36,9 @@ export default function Layout({ children }: { children: ReactNode }) {
         <title>WhatsApp Relationship Analytics</title>
       </Head>
       <div className="min-h-screen relative" style={{ backgroundColor: "var(--bg-color)", color: "var(--text-color)" }}>
-        <div
-          className="pointer-events-none fixed inset-0 -z-10"
-          style={{
-            backgroundColor: "var(--main-color)",
-            maskImage: "url('/smoke.svg')",
-            WebkitMaskImage: "url('/smoke.svg')",
-            maskSize: "cover",
-            WebkitMaskSize: "cover",
-            maskRepeat: "no-repeat",
-            WebkitMaskRepeat: "no-repeat",
-            maskPosition: "center",
-            WebkitMaskPosition: "center",
-            opacity: 0.2,
-          }}
-        ></div>
+        <SmokeyBackground />
         <header
-          className="border-b"
+          className="relative z-10 border-b"
           style={{ backgroundColor: "var(--sub-alt-color)", borderColor: "var(--sub-color)" }}
         >
           <div className="px-6 py-4 flex items-center justify-between">
@@ -76,7 +63,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             </select>
           </div>
         </header>
-        <div className="flex">
+        <div className="flex relative z-10">
           <Sidebar />
           <main className="flex-1 p-6 space-y-6">
             {children}
