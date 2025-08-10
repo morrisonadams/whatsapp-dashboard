@@ -36,7 +36,9 @@ export default function Layout({ children }: { children: ReactNode }) {
         <title>WhatsApp Relationship Analytics</title>
       </Head>
       <div className="min-h-screen relative" style={{ backgroundColor: "var(--bg-color)", color: "var(--text-color)" }}>
+
         <SmokeyBackground />
+
         <header
           className="relative z-10 border-b"
           style={{ backgroundColor: "var(--sub-alt-color)", borderColor: "var(--sub-color)" }}
