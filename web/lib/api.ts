@@ -63,3 +63,51 @@ export async function getConflicts(
     };
   });
 }
+
+export async function getHighlights(
+  onProgress?: (current: number, total: number) => void
+) {
+  return new Promise<any[]>((resolve, reject) => {
+    const es = new EventSource(`${API_BASE}/highlights_stream`);
+    const periods: any[] = [];
+
+    const aggregate = (per: any[]) => {
+      const months: Record<string, {month: string; total_highlights: number; highlights: any[]}> = {};
+      for (const p of per) {
+        for (const h of (p.highlights || [])) {
+          const monthKey = new Date(h.date).toISOString().slice(0,7);
+          if (!months[monthKey]) {
+            months[monthKey] = {month: monthKey, total_highlights: 0, highlights: []};
+          }
+          months[monthKey].highlights.push(h);
+          months[monthKey].total_highlights += 1;
+        }
+      }
+      for (const m of Object.values(months)) {
+        m.highlights.sort((a,b)=>a.date.localeCompare(b.date));
+      }
+      return Object.values(months).sort((a,b)=>a.month.localeCompare(b.month));
+    };
+
+    es.onmessage = (ev) => {
+      if (ev.data === "[DONE]") {
+        es.close();
+        resolve(aggregate(periods));
+        return;
+      }
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.current && msg.total && onProgress) {
+          onProgress(msg.current, msg.total);
+        }
+        if (msg.period) periods.push(msg.period);
+      } catch {
+        // ignore malformed messages
+      }
+    };
+    es.onerror = () => {
+      es.close();
+      reject(new Error("Failed to stream highlights"));
+    };
+  });
+}
