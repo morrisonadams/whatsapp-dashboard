@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
+import KpiStrip from "@/components/KpiStrip";
 import useThemePalette from "@/lib/useThemePalette";
 
 type KPI = any;
@@ -103,14 +104,6 @@ async function fetchConflicts() {
     });
     return participants.map(p => ({ sender: p, messages: msgMap[p]||0, words: wordMap[p]||0 }));
   }, [kpis, startDate, endDate, participants]);
-
-  const filteredTotals = useMemo(() => {
-    if (!kpis) return { messages: 0, words: 0 };
-    if (!startDate && !endDate) return kpis.totals;
-    const totalMessages = (kpis.timeline_messages || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.messages,0);
-    const totalWords = (kpis.timeline_words || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.words,0);
-    return { messages: totalMessages, words: totalWords };
-  }, [kpis, startDate, endDate]);
 
   const handleZoom = (e: any) => {
     const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
@@ -460,20 +453,7 @@ async function fetchConflicts() {
                 <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-              <Card title="Messages" tooltip="Total messages exchanged in selected date range">
-                <div className="text-2xl font-bold">{filteredTotals.messages}</div>
-              </Card>
-              <Card title="Words" tooltip="Total words sent in selected date range">
-                <div className="text-2xl font-bold">{filteredTotals.words}</div>
-              </Card>
-              <Card title="We-ness ratio" tooltip="Share of 'we/us/our' versus first-person pronouns">
-                <div className="text-2xl font-bold">{kpis.we_ness_ratio.toFixed(2)}</div>
-              </Card>
-              <Card title="Profanity hits" tooltip="Count of messages containing common profanity">
-                <div className="text-2xl font-bold">{kpis.profanity_hits}</div>
-              </Card>
-            </div>
+            <KpiStrip kpis={kpis} startDate={startDate} endDate={endDate} />
           </section>
 
           <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
