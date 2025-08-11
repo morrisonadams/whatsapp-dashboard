@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
+import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
 import useThemePalette from "@/lib/useThemePalette";
 
 type KPI = any;
@@ -90,6 +91,12 @@ async function fetchConflicts() {
     return true;
   };
 
+  const heatDays = useMemo<string[]>(() => {
+    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
+    const tl = (kpis?.[key] || []).filter((r:any) => dateFilter(r.day));
+    return Array.from(new Set(tl.map((r:any)=>r.day))).sort() as string[];
+  }, [kpis, timelineMetric, startDate, endDate]);
+
   const filteredBySender = useMemo(() => {
     if (!kpis) return [] as Array<any>;
     if (!startDate && !endDate) return kpis.by_sender || [];
@@ -115,11 +122,8 @@ async function fetchConflicts() {
   const handleZoom = (e: any) => {
     const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
     if (dz.start == null || dz.end == null) return;
-    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
-    const tl = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
-    const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
-    if (days.length < 2) return;
-    const len = days.length - 1;
+    if (heatDays.length < 2) return;
+    const len = heatDays.length - 1;
     const startIdx = Math.round((dz.start / 100) * len);
     const endIdx = Math.round((dz.end / 100) * len);
     setZoomRange([startIdx, endIdx]);
@@ -324,29 +328,6 @@ async function fetchConflicts() {
     };
   };
 
-  const heatOption = () => {
-    const hm = (kpis?.heatmap || []).filter((r:any)=> heatPerson==="All" ? true : r.sender===heatPerson);
-    const hours = Array.from({length:24}).map((_,i)=>i);
-    const weekdays = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-    const mat = Array.from({length:7},()=>Array(24).fill(0));
-    hm.forEach((r:any)=>{ mat[r.weekday][r.hour] += r.count; });
-    const data:any[] = [];
-    for (let w=0; w<7; w++) for (let h=0; h<24; h++) data.push([h, w, mat[w][h]]);
-    const vmax = Math.max(1, ...data.map((d:any)=>d[2]));
-    return {
-      backgroundColor: "transparent",
-      textStyle: { color: palette.text },
-      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: hours, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "category", data: weekdays, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      visualMap: { min: 0, max: vmax, calculable: true, orient:"horizontal", left:"center", textStyle:{color: palette.text}, inRange:{color:[palette.series[0], palette.series[1], palette.series[5]]} },
-      series: [{
-        type: "heatmap",
-        data,
-        label: { show: false },
-      }]
-    };
-  };
 
   const conflictBarOption = () => {
     const months = conflicts.map(p=>p.month);
@@ -473,7 +454,7 @@ async function fetchConflicts() {
             </div>
           </section>
 
-          <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 xl:grid-rows-5 gap-6">
             <div>
               <Card title="Messages by sender">
                 <Chart option={messagesOption()} height={260} />
@@ -484,7 +465,7 @@ async function fetchConflicts() {
                 <Chart option={wordsOption()} height={260} />
               </Card>
             </div>
-            <div className="xl:row-span-2">
+            <div className="xl:row-span-4">
               <Card title="Timeline">
                 <div className="flex gap-2 mb-2 items-center">
                   <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
@@ -507,6 +488,25 @@ async function fetchConflicts() {
               <Card title="Seconds to reply">
                 <Chart option={replyOption()} height={260} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+              </Card>
+            </div>
+            <div id="heatmap" className="xl:col-span-3 xl:row-start-5">
+              <Card title="Daily rhythm heatmap (weekday × hour)">
+                <div className="flex gap-2 mb-2">
+                  <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
+                  {participants.map(p => (
+                    <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
+                  ))}
+                </div>
+                <DailyRhythmHeatmap
+                  data={kpis.heatmap || []}
+                  person={heatPerson}
+                  palette={palette}
+                  days={heatDays}
+                  zoomRange={zoomRange}
+                  startDate={startDate}
+                  endDate={endDate}
+                />
               </Card>
             </div>
           </section>
@@ -539,18 +539,6 @@ async function fetchConflicts() {
             <Card title="Conflict timeline">
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
-            </Card>
-          </section>
-
-          <section id="heatmap" className="grid grid-cols-1 gap-6">
-            <Card title="Daily rhythm heatmap (weekday × hour)">
-              <div className="flex gap-2 mb-2">
-                <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
-                {participants.map(p => (
-                  <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
-                ))}
-              </div>
-              <Chart option={heatOption()} height={360} />
             </Card>
           </section>
 
