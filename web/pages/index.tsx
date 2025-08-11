@@ -182,28 +182,31 @@ async function fetchConflicts() {
     };
   };
 
-  const wordsPerMessageOption = () => {
+  const messagesWordsPerDayOption = () => {
+    const daySet = new Set<string>();
+    (kpis?.timeline_messages || []).forEach((r:any)=>{ if(dateFilter(r.day)) daySet.add(r.day); });
+    const days = daySet.size || 1;
     const rows = filteredBySender.map(r => ({
       sender: r.sender,
-      messages: r.messages,
-      words: r.words,
-      wpm: r.messages ? r.words / r.messages : 0
+      messagesPerDay: r.messages / days,
+      wordsPerDay: r.words / days,
+      mpw: r.words ? r.messages / r.words : 0
     }));
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: {
-        formatter: (p: any) => `${p.data.sender}<br/>Messages: ${formatNumber(p.data.messages)}<br/>Words: ${formatNumber(p.data.words)}<br/>Words/msg: ${p.data.wpm.toFixed(2)}`
+        formatter: (p: any) => `${p.data.sender}<br/>Messages/day: ${p.data.messagesPerDay.toFixed(2)}<br/>Words/day: ${p.data.wordsPerDay.toFixed(2)}<br/>Msgs/word: ${p.data.mpw.toFixed(2)}`
       },
       xAxis: {
         type: "value",
-        name: "Messages",
+        name: "Messages/day",
         axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
         axisLine: { lineStyle: { color: palette.subtext } }
       },
       yAxis: {
         type: "value",
-        name: "Words",
+        name: "Words/day",
         axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
         axisLine: { lineStyle: { color: palette.subtext } }
       },
@@ -211,12 +214,12 @@ async function fetchConflicts() {
         {
           type: "scatter",
           data: rows.map(r => ({
-            value: [r.messages, r.words],
+            value: [r.messagesPerDay, r.wordsPerDay],
             sender: r.sender,
-            messages: r.messages,
-            words: r.words,
-            wpm: r.wpm,
-            symbolSize: Math.max(20, Math.min(80, r.wpm * 5)),
+            messagesPerDay: r.messagesPerDay,
+            wordsPerDay: r.wordsPerDay,
+            mpw: r.mpw,
+            symbolSize: Math.max(20, Math.min(80, r.mpw * 200)),
             itemStyle: { color: colorMap[r.sender] }
           })),
           label: { show: true, formatter: (p:any) => p.data.sender, color: palette.text }
@@ -499,8 +502,8 @@ async function fetchConflicts() {
               </Card>
             </div>
             <div>
-              <Card title="Words per message">
-                <Chart option={wordsPerMessageOption()} height={260} />
+              <Card title="Messages vs Words per Day">
+                <Chart option={messagesWordsPerDayOption()} height={260} />
               </Card>
             </div>
             <div>
