@@ -10,11 +10,11 @@ const sections = [
 
 export default function Sidebar() {
   return (
-    <nav className="hidden md:block w-56 bg-white/5 border-r border-white/10 p-4">
+    <nav className="hidden md:block w-56 bg-sub-alt border-r border-sub p-4 text-text">
       <ul className="space-y-2 text-sm">
         {sections.map((s) => (
           <li key={s.id}>
-            <a href={`#${s.id}`} className="block px-3 py-2 rounded hover:bg-white/10">
+            <a href={`#${s.id}`} className="block px-3 py-2 rounded hover:bg-sub">
               {s.label}
             </a>
           </li>
