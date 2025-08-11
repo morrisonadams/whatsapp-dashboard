@@ -35,27 +35,21 @@ export default function Layout({ children }: { children: ReactNode }) {
       <Head>
         <title>WhatsApp Relationship Analytics</title>
       </Head>
-      <div className="min-h-screen relative" style={{ backgroundColor: "var(--bg-color)", color: "var(--text-color)" }}>
+      <div className="min-h-screen relative bg-bg text-text">
 
         <SmokeyBackground />
 
         <header
-          className="relative z-10 border-b"
-          style={{ backgroundColor: "var(--sub-alt-color)", borderColor: "var(--sub-color)" }}
+          className="relative z-10 border-b bg-sub-alt border-sub"
         >
           <div className="px-6 py-4 flex items-center justify-between">
-            <h1 className="text-2xl font-semibold" style={{ color: "var(--main-color)" }}>
+            <h1 className="text-2xl font-semibold text-main">
               WhatsApp Relationship Analytics
             </h1>
             <select
               value={theme}
               onChange={(e) => setTheme(e.target.value)}
-              className="text-sm rounded px-2 py-1"
-              style={{
-                backgroundColor: "var(--sub-alt-color)",
-                color: "var(--text-color)",
-                border: "1px solid var(--sub-color)",
-              }}
+              className="text-sm rounded px-2 py-1 bg-sub-alt text-text border border-sub"
             >
               {KEYCAP_THEME_NAMES.map((t) => (
                 <option key={t} value={t}>

@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-color: #F2D4CF;
+  --text-color: #2E2A2B;
+  --sub-color: #C48E86;
+  --sub-alt-color: #BFB6B0;
+  --main-color: #A56E63;
+}
+
 body {
   @apply font-sans;
   color: var(--text-color);
