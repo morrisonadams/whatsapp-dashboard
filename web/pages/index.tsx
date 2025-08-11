@@ -4,6 +4,8 @@ import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
 import useThemePalette from "@/lib/useThemePalette";
+import ConflictTimelineStrip from "@/components/ConflictTimelineStrip";
+import ConflictCardList from "@/components/ConflictCardList";
 
 type KPI = any;
 const formatNumber = (n: number) => n.toLocaleString();
@@ -17,6 +19,7 @@ export default function Home() {
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
+  const [conflictDateFilter, setConflictDateFilter] = useState<string | null>(null);
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
   const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
@@ -48,6 +51,7 @@ async function fetchConflicts() {
   try {
     const p = await getConflicts((current,total)=>setConflictProgress({current,total}));
     setConflicts(p);
+    setConflictDateFilter(null);
     setSelectedConflict(null);
     setConflictErr(null);
   } catch (e: any) {
@@ -80,6 +84,7 @@ async function fetchConflicts() {
     return map;
   }, [participants, palette]);
 
+  const allConflicts = useMemo(() => conflicts.flatMap(p => p.conflicts || []), [conflicts]);
   const wordCloudParticipants = participants.slice(0, 2);
   const wordCategories = ["emoji", "swear", "sexual", "space"];
   const [wordFilters, setWordFilters] = useState<string[]>([]);
@@ -495,6 +500,7 @@ async function fetchConflicts() {
                   </label>
                 </div>
                 <Chart option={timelineOption()} height={360} onEvents={{ datazoom: handleZoom }} />
+                <ConflictTimelineStrip conflicts={allConflicts} onSelectDate={setConflictDateFilter} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
               </Card>
             </div>
@@ -540,6 +546,13 @@ async function fetchConflicts() {
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
             </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-6 lg:grid-rows-6">
+              <div className="lg:col-start-2 lg:col-span-5 lg:row-start-6">
+                <Card title="Conflicts">
+                  <ConflictCardList conflicts={allConflicts} filterDate={conflictDateFilter} />
+                </Card>
+              </div>
+            </div>
           </section>
 
           <section id="heatmap" className="grid grid-cols-1 gap-6">
