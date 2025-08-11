@@ -3,9 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
-import MessageWordBySender from "@/components/MessageWordBySender";
-import useThemePalette from "@/lib/useThemePalette";
-import { useParticipantColors } from "@/lib/ParticipantColors";
 import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
 import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
 import UnifiedTimeline from "@/components/UnifiedTimeline";
@@ -31,7 +28,6 @@ export default function Home() {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const palette = useThemePalette();
-  const { participants, colorMap, setParticipants } = useParticipantColors();
 
   useEffect(() => {
     fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version")
@@ -47,15 +43,6 @@ export default function Home() {
       setEndDate(days[days.length - 1]);
     }
   }, [kpis]);
-
-  useEffect(() => {
-    const ps = kpis?.participants ?? (kpis?.by_sender?.map((r:any)=>r.sender) ?? []);
-    setParticipants(ps);
-  }, [kpis, setParticipants]);
-
-   useEffect(() => {
-    setZoomRange(null);
-  }, [timelineMetric, startDate, endDate, kpis]);
 
 
 async function fetchConflicts() {
@@ -83,6 +70,16 @@ async function fetchConflicts() {
       setBusy(false);
     }
   };
+
+  const participants: string[] = useMemo(() => kpis?.participants ?? (kpis?.by_sender?.map((r:any)=>r.sender) ?? []), [kpis]);
+
+  const colorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    participants.forEach((p, i) => {
+      map[p] = palette.series[i % palette.series.length];
+    });
+    return map;
+  }, [participants, palette]);
 
   const wordCloudParticipants = participants.slice(0, 2);
   const wordCategories = ["emoji", "swear", "sexual", "space"];
@@ -138,6 +135,41 @@ async function fetchConflicts() {
     setZoomRange([startIdx, endIdx]);
   };
 
+  const messagesOption = () => {
+    const rows = filteredBySender;
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
+      xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
+      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
+      series: [
+        {
+          type: "bar",
+          data: rows.map((r:any)=>({ value: r.messages, itemStyle: { color: colorMap[r.sender] } })),
+          barWidth: "40%"
+        }
+      ]
+    };
+  };
+
+  const wordsOption = () => {
+    const rows = filteredBySender;
+    return {
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
+      xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
+      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
+      series: [
+        {
+          type: "bar",
+          data: rows.map((r:any)=>({ value: r.words, itemStyle: { color: colorMap[r.sender] } })),
+          barWidth: "40%"
+        }
+      ]
+    };
+  };
 
   const wordsPerMessageOption = () => {
   const replyOption = () => {
@@ -332,10 +364,6 @@ async function fetchConflicts() {
             </Card>
           </section>
 
-          <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div className="xl:col-span-2">
-              <Card title="Messages & words by sender">
-                <MessageWordBySender rows={filteredBySender} />
           <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 xl:grid-rows-5 gap-6">
             <div>
               <Card title="Messages by sender">

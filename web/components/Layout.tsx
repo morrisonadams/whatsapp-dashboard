@@ -4,7 +4,6 @@ import { ReactNode } from "react";
 
 import Sidebar from "@/components/Sidebar";
 import SmokeyBackground from "@/components/SmokeyBackground";
-import ColorLegend from "@/components/ColorLegend";
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
@@ -17,11 +16,10 @@ export default function Layout({ children }: { children: ReactNode }) {
         <SmokeyBackground />
 
         <header className="relative z-10 border-b bg-sub-alt border-sub">
-          <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="px-6 py-4">
             <h1 className="text-2xl font-semibold text-main">
               WhatsApp Relationship Analytics
             </h1>
-            <ColorLegend />
           </div>
         </header>
         <div className="flex relative z-10">
