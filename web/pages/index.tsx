@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
+import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
 import useThemePalette from "@/lib/useThemePalette";
 
 type KPI = any;
@@ -155,27 +156,6 @@ async function fetchConflicts() {
         {
           type: "bar",
           data: rows.map((r:any)=>({ value: r.words, itemStyle: { color: colorMap[r.sender] } })),
-          barWidth: "40%"
-        }
-      ]
-    };
-  };
-
-  const replyOption = () => {
-    const rs = (kpis?.reply_simple || []) as Array<any>;
-    return {
-      backgroundColor: "transparent",
-      textStyle: { color: palette.text },
-      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: participants, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series: [
-        {
-          type: "bar",
-          data: participants.map(p => {
-            const row = rs.find((r:any)=>r.person===p) || {};
-            return { value: row.seconds || 0, itemStyle: { color: colorMap[p] } };
-          }),
           barWidth: "40%"
         }
       ]
@@ -504,9 +484,8 @@ async function fetchConflicts() {
               </Card>
             </div>
             <div>
-              <Card title="Seconds to reply">
-                <Chart option={replyOption()} height={260} />
-                {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+              <Card title="Reply time distribution">
+                <ReplyTimeDistribution data={kpis?.reply_pairs || []} startDate={startDate} endDate={endDate} />
               </Card>
             </div>
           </section>
