@@ -5,6 +5,7 @@ import Card from "@/components/Card";
 import Chart from "@/components/Chart";
 import KpiStrip from "@/components/KpiStrip";
 import useThemePalette from "@/lib/useThemePalette";
+import UnifiedTimeline from "@/components/UnifiedTimeline";
 
 type KPI = any;
 const formatNumber = (n: number) => n.toLocaleString();
@@ -18,12 +19,9 @@ export default function Home() {
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
-  const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
-  const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const palette = useThemePalette();
 
   useEffect(() => {
@@ -40,10 +38,6 @@ export default function Home() {
       setEndDate(days[days.length - 1]);
     }
   }, [kpis]);
-
-   useEffect(() => {
-    setZoomRange(null);
-  }, [timelineMetric, startDate, endDate, kpis]);
 
 async function fetchConflicts() {
   try {
@@ -105,18 +99,14 @@ async function fetchConflicts() {
     return participants.map(p => ({ sender: p, messages: msgMap[p]||0, words: wordMap[p]||0 }));
   }, [kpis, startDate, endDate, participants]);
 
-  const handleZoom = (e: any) => {
-    const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
-    if (dz.start == null || dz.end == null) return;
-    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
-    const tl = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
-    const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
-    if (days.length < 2) return;
-    const len = days.length - 1;
-    const startIdx = Math.round((dz.start / 100) * len);
-    const endIdx = Math.round((dz.end / 100) * len);
-    setZoomRange([startIdx, endIdx]);
-  };
+  const conflictMarkers = useMemo(
+    () => conflicts.flatMap(p => (p.conflicts || []).map((c:any) => ({ date: c.date, summary: c.summary }))),
+    [conflicts]
+  );
+  const affectionMarkers = useMemo(
+    () => (kpis?.timeline_affection || []) as Array<{day:string; affection:number}>,
+    [kpis]
+  );
 
   const messagesOption = () => {
     const rows = filteredBySender;
@@ -221,104 +211,6 @@ async function fetchConflicts() {
     };
   };
 
-  const timelineOption = () => {
-    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
-    const tlAll = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
-    const allDays: string[] = Array.from(new Set<string>(tlAll.map((r:any)=>r.day))).sort();
-    let startIdx = zoomRange ? zoomRange[0] : 0;
-    let endIdx = zoomRange ? zoomRange[1] : allDays.length - 1;
-    startIdx = Math.max(0, Math.min(startIdx, allDays.length - 1));
-    endIdx = Math.max(0, Math.min(endIdx, allDays.length - 1));
-    if (endIdx < startIdx) endIdx = startIdx;
-    const visibleDays = allDays.slice(startIdx, endIdx + 1);
-    const visibleTl = tlAll.filter((r:any) => {
-      const idx = allDays.indexOf(r.day);
-      return idx >= startIdx && idx <= endIdx;
-    });
-    const senders: string[] = Array.from(new Set(visibleTl.map((r:any)=>r.sender)));
-    const useWeeks = visibleDays.length > 90;
-    let axis: string[] = [];
-    const dataPerSender: Record<string, number[]> = {};
-    senders.forEach(s => dataPerSender[s] = []);
-    if (useWeeks) {
-      const getWeekStart = (dStr: string) => {
-        const d = new Date(dStr + "T00:00:00Z");
-        const day = d.getUTCDay();
-        const diff = (day + 6) % 7;
-        d.setUTCDate(d.getUTCDate() - diff);
-        return d.toISOString().slice(0,10);
-      };
-      const weekMap: Record<string, Record<string, number>> = {};
-      visibleTl.forEach((r:any) => {
-        const week = getWeekStart(r.day);
-        if (!weekMap[week]) weekMap[week] = {};
-        weekMap[week][r.sender] = (weekMap[week][r.sender] || 0) + (timelineMetric === "messages" ? r.messages : r.words);
-      });
-      axis = Object.keys(weekMap).sort();
-      senders.forEach(s => {
-        dataPerSender[s] = axis.map(w => weekMap[w][s] || 0);
-      });
-    } else {
-      const dayMap: Record<string, Record<string, number>> = {};
-      visibleTl.forEach((r:any) => {
-        if (!dayMap[r.day]) dayMap[r.day] = {};
-        dayMap[r.day][r.sender] = (timelineMetric === "messages" ? r.messages : r.words);
-      });
-      axis = visibleDays;
-      senders.forEach(s => {
-        dataPerSender[s] = axis.map(d => (dayMap[d] && dayMap[d][s]) || 0);
-      });
-    }
-    const series = senders.map((s: string, i:number) => {
-      const values = dataPerSender[s];
-      let markLine: any = undefined;
-      if (showTrend && values.length > 1) {
-        const n = values.length;
-        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-        for (let j = 0; j < n; j++) {
-          sumX += j;
-          sumY += values[j];
-          sumXY += j * values[j];
-          sumXX += j * j;
-        }
-        const denom = n * sumXX - sumX * sumX || 1;
-        const slope = (n * sumXY - sumX * sumY) / denom;
-        const intercept = (sumY - slope * sumX) / n;
-        const startY = intercept;
-        const endY = intercept + slope * (n - 1);
-        markLine = {
-          symbol: "none",
-          lineStyle: { type: "dashed", color: colorMap[s] || palette.series[i % palette.series.length] },
-          data: [[{ coord: [axis[0], startY] }, { coord: [axis[n - 1], endY] }]]
-        };
-      }
-      return {
-        name: s,
-        type: "line",
-        smooth: true,
-        lineStyle: { width: 3 },
-        itemStyle: { color: colorMap[s] || palette.series[i % palette.series.length] },
-        data: values,
-        ...(markLine ? { markLine } : {})
-      };
-    });
-    const lenAll = Math.max(1, allDays.length - 1);
-    const startPercent = (startIdx / lenAll) * 100;
-    const endPercent = (endIdx / lenAll) * 100;
-    return {
-      backgroundColor: "transparent",
-      textStyle: { color: palette.text },
-      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      dataZoom: [
-        { type: 'inside', start: startPercent, end: endPercent },
-        { type: 'slider', start: startPercent, end: endPercent }
-      ],
-      legend: { data: senders, textStyle:{color: palette.text} },
-      xAxis: { type: "category", data: axis, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series
-    };
-  };
 
   const heatOption = () => {
     const hm = (kpis?.heatmap || []).filter((r:any)=> heatPerson==="All" ? true : r.sender===heatPerson);
@@ -469,16 +361,16 @@ async function fetchConflicts() {
             </div>
             <div className="xl:row-span-2">
               <Card title="Timeline">
-                <div className="flex gap-2 mb-2 items-center">
-                  <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
-                  <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
-                  <label className="flex items-center text-sm ml-auto">
-                    <input type="checkbox" className="mr-1" checked={showTrend} onChange={e=>setShowTrend(e.target.checked)} />
-                    Trend
-                  </label>
-                </div>
-                <Chart option={timelineOption()} height={360} onEvents={{ datazoom: handleZoom }} />
-                {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+                <UnifiedTimeline
+                  messages={kpis.timeline_messages || []}
+                  words={kpis.timeline_words || []}
+                  conflicts={conflictMarkers}
+                  affection={affectionMarkers}
+                  startDate={startDate}
+                  endDate={endDate}
+                  onRangeChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+                />
+                {(!kpis || (kpis.timeline_messages || []).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
               </Card>
             </div>
             <div>
