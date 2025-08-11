@@ -5,6 +5,8 @@ import Card from "@/components/Card";
 import Chart from "@/components/Chart";
 import MessageWordBySender from "@/components/MessageWordBySender";
 import useThemePalette from "@/lib/useThemePalette";
+import ConflictTimelineStrip from "@/components/ConflictTimelineStrip";
+import ConflictCardList from "@/components/ConflictCardList";
 import { useParticipantColors } from "@/lib/ParticipantColors";
 import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
 import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
@@ -12,7 +14,6 @@ import UnifiedTimeline from "@/components/UnifiedTimeline";
 import KpiStrip from "@/components/KpiStrip";
 import useThemePalette from "@/lib/useThemePalette";
 import SenderShareChart from "@/components/SenderShareChart";
-
 import { DateRangeContext } from "@/lib/DateRangeContext";
 
 type KPI = any;
@@ -27,6 +28,9 @@ export default function Home() {
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
+  const [conflictDateFilter, setConflictDateFilter] = useState<string | null>(null);
+  const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
+  const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -62,6 +66,7 @@ async function fetchConflicts() {
   try {
     const p = await getConflicts((current,total)=>setConflictProgress({current,total}));
     setConflicts(p);
+    setConflictDateFilter(null);
     setSelectedConflict(null);
     setConflictErr(null);
   } catch (e: any) {
@@ -84,6 +89,17 @@ async function fetchConflicts() {
     }
   };
 
+  const participants: string[] = useMemo(() => kpis?.participants ?? (kpis?.by_sender?.map((r:any)=>r.sender) ?? []), [kpis]);
+
+  const colorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    participants.forEach((p, i) => {
+      map[p] = palette.series[i % palette.series.length];
+    });
+    return map;
+  }, [participants, palette]);
+
+  const allConflicts = useMemo(() => conflicts.flatMap(p => p.conflicts || []), [conflicts]);
   const wordCloudParticipants = participants.slice(0, 2);
   const wordCategories = ["emoji", "swear", "sexual", "space"];
   const [wordFilters, setWordFilters] = useState<string[]>([]);
@@ -358,6 +374,7 @@ async function fetchConflicts() {
                   </label>
                 </div>
                 <Chart option={timelineOption()} height={360} onEvents={{ datazoom: handleZoom }} />
+                <ConflictTimelineStrip conflicts={allConflicts} onSelectDate={setConflictDateFilter} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
             <div>
               <Card title="Messages vs Words per Day">
@@ -425,6 +442,13 @@ async function fetchConflicts() {
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
             </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-6 lg:grid-rows-6">
+              <div className="lg:col-start-2 lg:col-span-5 lg:row-start-6">
+                <Card title="Conflicts">
+                  <ConflictCardList conflicts={allConflicts} filterDate={conflictDateFilter} />
+                </Card>
+              </div>
+            </div>
           </section>
 
           <section id="wordcloud" className="grid grid-cols-1 gap-6">
