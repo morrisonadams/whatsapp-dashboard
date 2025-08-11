@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts, getHighlights } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
@@ -363,59 +363,61 @@ async function fetchHighlights() {
     };
   };
 
-  const momentsBarOption = () => {
+  const momentsBarOption = useMemo(() => {
     const monthSet = new Set<string>();
-    conflicts.forEach(p=>monthSet.add(p.month));
-    highlights.forEach(p=>monthSet.add(p.month));
+    conflicts.forEach(p => monthSet.add(p.month));
+    highlights.forEach(p => monthSet.add(p.month));
     const months = Array.from(monthSet).sort();
-    const conflictTotals = months.map(m => conflicts.find(c=>c.month===m)?.total_conflicts || 0);
-    const highlightTotals = months.map(m => highlights.find(h=>h.month===m)?.total_highlights || 0);
+    const conflictTotals = months.map(m => conflicts.find(c => c.month === m)?.total_conflicts || 0);
+    const highlightTotals = months.map(m => highlights.find(h => h.month === m)?.total_highlights || 0);
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      legend: { data:["Conflicts","Highlights"], textStyle:{color: palette.text} },
-      xAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      legend: { data: ["Conflicts", "Highlights"], textStyle: { color: palette.text } },
+      xAxis: { type: "category", data: months, axisLabel: { color: palette.text }, axisLine: { lineStyle: { color: palette.subtext } } },
+      yAxis: { type: "value", axisLabel: { color: palette.text, formatter: (value: number) => formatNumber(value) }, axisLine: { lineStyle: { color: palette.subtext } } },
       series: [
-        { name:"Conflicts", type: "bar", data: conflictTotals, itemStyle:{ color: palette.series[3] }, barWidth: "40%" },
-        { name:"Highlights", type: "bar", data: highlightTotals, itemStyle:{ color: palette.series[4] }, barWidth: "40%" }
+        { name: "Conflicts", type: "bar", data: conflictTotals, itemStyle: { color: palette.series[3] }, barWidth: "40%" },
+        { name: "Highlights", type: "bar", data: highlightTotals, itemStyle: { color: palette.series[4] }, barWidth: "40%" }
       ],
       grid: { left: 40, right: 20, top: 20, bottom: 60 }
     };
-  };
+  }, [conflicts, highlights, palette]);
 
-  const onMomentBarClick = (p:any) => {
+  const onMomentBarClick = useCallback((p: any) => {
     const month = p.name;
     if (p.seriesName === "Conflicts") {
-      const m = conflicts.find(c=>c.month===month);
-      setSelectedMoment(m ? {...m, type:"conflict"} : null);
+      const m = conflicts.find(c => c.month === month);
+      setSelectedMoment(m ? { month, type: "conflicts", items: m.conflicts } : null);
     } else if (p.seriesName === "Highlights") {
-      const m = highlights.find(h=>h.month===month);
-      setSelectedMoment(m ? {...m, type:"highlight"} : null);
+      const m = highlights.find(h => h.month === month);
+      setSelectedMoment(m ? { month, type: "highlights", items: m.highlights } : null);
     }
-  };
+  }, [conflicts, highlights]);
 
-  const momentsTimelineOption = () => {
-    const conflictPts = conflicts.flatMap(p => (p.conflicts||[]).map((c:any)=>({date:c.date, summary:c.summary})));
-    const highlightPts = highlights.flatMap(p => (p.highlights||[]).map((h:any)=>({date:h.date, summary:h.summary})));
+  const momentBarEvents = useMemo(() => ({ click: onMomentBarClick }), [onMomentBarClick]);
+
+  const momentsTimelineOption = useMemo(() => {
+    const conflictPts = conflicts.flatMap(p => (p.conflicts || []).map((c: any) => ({ date: c.date, summary: c.summary })));
+    const highlightPts = highlights.flatMap(p => (p.highlights || []).map((h: any) => ({ date: h.date, summary: h.summary })));
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: {
-        formatter: (p:any) => `${p.data.date}<br/>${p.data.summary}`,
+        formatter: (p: any) => `${p.data.date}<br/>${p.data.summary}`,
         appendToBody: true,
         extraCssText: 'max-width: 320px; white-space: normal; word-break: break-word; z-index: 1000;'
       },
-      legend: { data:["Conflicts","Highlights"], textStyle:{color: palette.text} },
-      xAxis: { type: "time", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      legend: { data: ["Conflicts", "Highlights"], textStyle: { color: palette.text } },
+      xAxis: { type: "time", axisLabel: { color: palette.text }, axisLine: { lineStyle: { color: palette.subtext } } },
       yAxis: { show: false },
       series: [
-        { name:"Conflicts", type: "scatter", symbolSize:8, data: conflictPts.map(p=>({ value:[p.date,1], date:p.date, summary:p.summary })), itemStyle:{ color: palette.series[3] } },
-        { name:"Highlights", type: "scatter", symbol:"diamond", symbolSize:8, data: highlightPts.map(p=>({ value:[p.date,1], date:p.date, summary:p.summary })), itemStyle:{ color: palette.series[4] } }
+        { name: "Conflicts", type: "scatter", symbolSize: 8, data: conflictPts.map(p => ({ value: [p.date, 1], date: p.date, summary: p.summary })), itemStyle: { color: palette.series[3] } },
+        { name: "Highlights", type: "scatter", symbol: "diamond", symbolSize: 8, data: highlightPts.map(p => ({ value: [p.date, 1], date: p.date, summary: p.summary })), itemStyle: { color: palette.series[4] } }
       ]
     };
-  };
+  }, [conflicts, highlights, palette]);
 
   const wordCloudOption = (person: string) => {
     const raw = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number; tags?:string[]}>;
@@ -554,15 +556,15 @@ async function fetchHighlights() {
                     {highlightProgress && <>Analyzing highlights {highlightProgress.current}/{highlightProgress.total} segments...</>}
                   </div>
                 )}
-                <Chart option={momentsBarOption()} height={260} onEvents={{ click: onMomentBarClick }} />
+                <Chart option={momentsBarOption} height={260} onEvents={momentBarEvents} />
                 {!conflictProgress && !highlightProgress && conflicts.length===0 && highlights.length===0 && <div className="text-sm text-gray-400 mt-2">No moment data yet.</div>}
                 {conflictErr && <div className="text-red-400 text-sm mt-2">{conflictErr}</div>}
                 {highlightErr && <div className="text-red-400 text-sm mt-2">{highlightErr}</div>}
               </Card>
-              <Card title={selectedMoment ? `${selectedMoment.type === 'conflict' ? 'Conflicts' : 'Highlights'} in ${selectedMoment.month}` : "Event details"}>
+              <Card title={selectedMoment ? `${selectedMoment.type === 'conflicts' ? 'Conflicts' : 'Highlights'} in ${selectedMoment.month}` : "Event details"}>
                 {selectedMoment ? (
                   <ul className="text-sm text-gray-300 list-disc ml-5">
-                    {(selectedMoment[selectedMoment.type]||[]).map((c:any,i:number)=>(
+                    {selectedMoment.items.map((c:any,i:number)=>(
                       <li key={i}><span className="font-mono">{c.date}</span>: {c.summary}</li>
                     ))}
                   </ul>
@@ -574,7 +576,7 @@ async function fetchHighlights() {
               </Card>
             </div>
             <Card title="Timeline of conflicts and highlights">
-              <Chart option={momentsTimelineOption()} height={200} />
+              <Chart option={momentsTimelineOption} height={200} />
               {!conflictProgress && !highlightProgress && conflicts.length===0 && highlights.length===0 && <div className="text-sm text-gray-400 mt-2">No moment data yet.</div>}
             </Card>
           </section>
