@@ -3,7 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
+import MessageWordBySender from "@/components/MessageWordBySender";
 import useThemePalette from "@/lib/useThemePalette";
+import ConflictTimelineStrip from "@/components/ConflictTimelineStrip";
+import ConflictCardList from "@/components/ConflictCardList";
+import { useParticipantColors } from "@/lib/ParticipantColors";
+import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
+import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
+import UnifiedTimeline from "@/components/UnifiedTimeline";
+import KpiStrip from "@/components/KpiStrip";
+import useThemePalette from "@/lib/useThemePalette";
+import SenderShareChart from "@/components/SenderShareChart";
+import { DateRangeContext } from "@/lib/DateRangeContext";
 
 type KPI = any;
 const formatNumber = (n: number) => n.toLocaleString();
@@ -17,13 +28,14 @@ export default function Home() {
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
+  const [conflictDateFilter, setConflictDateFilter] = useState<string | null>(null);
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
   const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [zoomRange, setZoomRange] = useState<[number, number] | null>(null);
   const palette = useThemePalette();
+  const { participants, colorMap, setParticipants } = useParticipantColors();
 
   useEffect(() => {
     fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version")
@@ -40,14 +52,21 @@ export default function Home() {
     }
   }, [kpis]);
 
+  useEffect(() => {
+    const ps = kpis?.participants ?? (kpis?.by_sender?.map((r:any)=>r.sender) ?? []);
+    setParticipants(ps);
+  }, [kpis, setParticipants]);
+
    useEffect(() => {
     setZoomRange(null);
   }, [timelineMetric, startDate, endDate, kpis]);
+
 
 async function fetchConflicts() {
   try {
     const p = await getConflicts((current,total)=>setConflictProgress({current,total}));
     setConflicts(p);
+    setConflictDateFilter(null);
     setSelectedConflict(null);
     setConflictErr(null);
   } catch (e: any) {
@@ -80,6 +99,7 @@ async function fetchConflicts() {
     return map;
   }, [participants, palette]);
 
+  const allConflicts = useMemo(() => conflicts.flatMap(p => p.conflicts || []), [conflicts]);
   const wordCloudParticipants = participants.slice(0, 2);
   const wordCategories = ["emoji", "swear", "sexual", "space"];
   const [wordFilters, setWordFilters] = useState<string[]>([]);
@@ -89,6 +109,12 @@ async function fetchConflicts() {
     if (endDate && day > endDate) return false;
     return true;
   };
+
+  const heatDays = useMemo<string[]>(() => {
+    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
+    const tl = (kpis?.[key] || []).filter((r:any) => dateFilter(r.day));
+    return Array.from(new Set(tl.map((r:any)=>r.day))).sort() as string[];
+  }, [kpis, timelineMetric, startDate, endDate]);
 
   const filteredBySender = useMemo(() => {
     if (!kpis) return [] as Array<any>;
@@ -111,6 +137,7 @@ async function fetchConflicts() {
     const totalWords = (kpis.timeline_words || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.words,0);
     return { messages: totalMessages, words: totalWords };
   }, [kpis, startDate, endDate]);
+
 
   const weProfMetrics = useMemo(() => {
     if (!kpis) return { we: 0, prof: 0, weDelta: 0, profDelta: 0 };
@@ -141,14 +168,12 @@ async function fetchConflicts() {
     return { we: weRate, prof: profRate, weDelta: weRate - prevWeRate, profDelta: profRate - prevProfRate };
   }, [kpis, startDate, endDate, filteredTotals]);
 
+
   const handleZoom = (e: any) => {
     const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
     if (dz.start == null || dz.end == null) return;
-    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
-    const tl = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
-    const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
-    if (days.length < 2) return;
-    const len = days.length - 1;
+    if (heatDays.length < 2) return;
+    const len = heatDays.length - 1;
     const startIdx = Math.round((dz.start / 100) * len);
     const endIdx = Math.round((dz.end / 100) * len);
     setZoomRange([startIdx, endIdx]);
@@ -190,6 +215,7 @@ async function fetchConflicts() {
     };
   };
 
+  const wordsPerMessageOption = () => {
   const replyOption = () => {
     const rs = (kpis?.reply_simple || []) as Array<any>;
     return {
@@ -211,28 +237,31 @@ async function fetchConflicts() {
     };
   };
 
-  const wordsPerMessageOption = () => {
+  const messagesWordsPerDayOption = () => {
+    const daySet = new Set<string>();
+    (kpis?.timeline_messages || []).forEach((r:any)=>{ if(dateFilter(r.day)) daySet.add(r.day); });
+    const days = daySet.size || 1;
     const rows = filteredBySender.map(r => ({
       sender: r.sender,
-      messages: r.messages,
-      words: r.words,
-      wpm: r.messages ? r.words / r.messages : 0
+      messagesPerDay: r.messages / days,
+      wordsPerDay: r.words / days,
+      mpw: r.words ? r.messages / r.words : 0
     }));
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: {
-        formatter: (p: any) => `${p.data.sender}<br/>Messages: ${formatNumber(p.data.messages)}<br/>Words: ${formatNumber(p.data.words)}<br/>Words/msg: ${p.data.wpm.toFixed(2)}`
+        formatter: (p: any) => `${p.data.sender}<br/>Messages/day: ${p.data.messagesPerDay.toFixed(2)}<br/>Words/day: ${p.data.wordsPerDay.toFixed(2)}<br/>Msgs/word: ${p.data.mpw.toFixed(2)}`
       },
       xAxis: {
         type: "value",
-        name: "Messages",
+        name: "Messages/day",
         axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
         axisLine: { lineStyle: { color: palette.subtext } }
       },
       yAxis: {
         type: "value",
-        name: "Words",
+        name: "Words/day",
         axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
         axisLine: { lineStyle: { color: palette.subtext } }
       },
@@ -240,12 +269,12 @@ async function fetchConflicts() {
         {
           type: "scatter",
           data: rows.map(r => ({
-            value: [r.messages, r.words],
+            value: [r.messagesPerDay, r.wordsPerDay],
             sender: r.sender,
-            messages: r.messages,
-            words: r.words,
-            wpm: r.wpm,
-            symbolSize: Math.max(20, Math.min(80, r.wpm * 5)),
+            messagesPerDay: r.messagesPerDay,
+            wordsPerDay: r.wordsPerDay,
+            mpw: r.mpw,
+            symbolSize: Math.max(20, Math.min(80, r.mpw * 200)),
             itemStyle: { color: colorMap[r.sender] }
           })),
           label: { show: true, formatter: (p:any) => p.data.sender, color: palette.text }
@@ -465,6 +494,7 @@ async function fetchConflicts() {
   };
 
   return (
+    <DateRangeContext.Provider value={{ startDate, endDate, setStartDate, setEndDate }}>
     <>
       <div className="flex items-center justify-end">
         <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
@@ -504,9 +534,24 @@ async function fetchConflicts() {
                 {startDate && endDate && <div className="text-sm text-gray-300">{weProfMetrics.profDelta>=0?"+":""}{weProfMetrics.profDelta.toFixed(2)}</div>}
               </Card>
             </div>
+            <KpiStrip kpis={kpis} startDate={startDate} endDate={endDate} />
+          </section>
+          <section id="timeline" className="mt-6">
+            <Card title="Timeline">
+              <UnifiedTimeline
+                timelineMessages={kpis.timeline_messages || []}
+                timelineWords={kpis.timeline_words || []}
+                conflictDates={conflictDates}
+                affectionDates={affectionDates}
+              />
+            </Card>
           </section>
 
           <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
+              <Card title="Messages & words by sender">
+                <MessageWordBySender rows={filteredBySender} />
+          <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 xl:grid-rows-5 gap-6">
             <div>
               <Card title="Messages by sender" tooltip="Total messages per participant in selected range">
                 <Chart option={messagesOption()} height={260} />
@@ -528,7 +573,11 @@ async function fetchConflicts() {
                   </label>
                 </div>
                 <Chart option={timelineOption()} height={360} onEvents={{ datazoom: handleZoom }} />
+                <ConflictTimelineStrip conflicts={allConflicts} onSelectDate={setConflictDateFilter} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+            <div>
+              <Card title="Messages vs Words per Day">
+                <Chart option={messagesWordsPerDayOption()} height={260} />
               </Card>
             </div>
             <div>
@@ -540,6 +589,33 @@ async function fetchConflicts() {
               <Card title="Seconds to reply" tooltip="Average time from one person's message to another's reply">
                 <Chart option={replyOption()} height={260} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+              <Card title="Reply time distribution">
+                <ReplyTimeDistribution data={kpis?.reply_pairs || []} startDate={startDate} endDate={endDate} />
+              </Card>
+            </div>
+            <div>
+              <Card title="Sender share over time">
+                <SenderShareChart data={timelineData} participants={participants} colorMap={colorMap} zoomRange={zoomRange} />
+                {timelineData.length === 0 && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+              </Card>
+            </div>
+            <div id="heatmap" className="xl:col-span-3 xl:row-start-5">
+              <Card title="Daily rhythm heatmap (weekday × hour)">
+                <div className="flex gap-2 mb-2">
+                  <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
+                  {participants.map(p => (
+                    <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
+                  ))}
+                </div>
+                <DailyRhythmHeatmap
+                  data={kpis.heatmap || []}
+                  person={heatPerson}
+                  palette={palette}
+                  days={heatDays}
+                  zoomRange={zoomRange}
+                  startDate={startDate}
+                  endDate={endDate}
+                />
               </Card>
             </div>
           </section>
@@ -582,9 +658,13 @@ async function fetchConflicts() {
                 {participants.map(p => (
                   <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
                 ))}
+            <div className="grid grid-cols-1 lg:grid-cols-6 lg:grid-rows-6">
+              <div className="lg:col-start-2 lg:col-span-5 lg:row-start-6">
+                <Card title="Conflicts">
+                  <ConflictCardList conflicts={allConflicts} filterDate={conflictDateFilter} />
+                </Card>
               </div>
-              <Chart option={heatOption()} height={360} />
-            </Card>
+            </div>
           </section>
 
           <section id="wordcloud" className="grid grid-cols-1 gap-6">
@@ -652,5 +732,6 @@ async function fetchConflicts() {
         )}
         <div className="text-xs text-gray-400">v0.2.9 — visual refinements • API v{apiVersion}</div>
     </>
+    </DateRangeContext.Provider>
   );
 }
