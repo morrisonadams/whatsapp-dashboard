@@ -4,6 +4,7 @@ import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
 import UnifiedTimeline from "@/components/UnifiedTimeline";
+import KpiStrip from "@/components/KpiStrip";
 import useThemePalette from "@/lib/useThemePalette";
 import { DateRangeContext } from "@/lib/DateRangeContext";
 
@@ -110,7 +111,18 @@ async function fetchConflicts() {
 
   const conflictDates = useMemo(() => conflicts.flatMap(p => (p.conflicts || []).map((c:any) => c.date)), [conflicts]);
   const affectionDates = useMemo(() => (kpis?.affection_timeline || []).map((r:any) => r.day), [kpis]);
-
+  const handleZoom = (e: any) => {
+    const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
+    if (dz.start == null || dz.end == null) return;
+    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
+    const tl = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
+    const days = Array.from(new Set(tl.map((r:any)=>r.day))).sort();
+    if (days.length < 2) return;
+    const len = days.length - 1;
+    const startIdx = Math.round((dz.start / 100) * len);
+    const endIdx = Math.round((dz.end / 100) * len);
+    setZoomRange([startIdx, endIdx]);
+  };
 
   const messagesOption = () => {
     const rows = filteredBySender;
@@ -169,28 +181,31 @@ async function fetchConflicts() {
     };
   };
 
-  const wordsPerMessageOption = () => {
+  const messagesWordsPerDayOption = () => {
+    const daySet = new Set<string>();
+    (kpis?.timeline_messages || []).forEach((r:any)=>{ if(dateFilter(r.day)) daySet.add(r.day); });
+    const days = daySet.size || 1;
     const rows = filteredBySender.map(r => ({
       sender: r.sender,
-      messages: r.messages,
-      words: r.words,
-      wpm: r.messages ? r.words / r.messages : 0
+      messagesPerDay: r.messages / days,
+      wordsPerDay: r.words / days,
+      mpw: r.words ? r.messages / r.words : 0
     }));
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: {
-        formatter: (p: any) => `${p.data.sender}<br/>Messages: ${formatNumber(p.data.messages)}<br/>Words: ${formatNumber(p.data.words)}<br/>Words/msg: ${p.data.wpm.toFixed(2)}`
+        formatter: (p: any) => `${p.data.sender}<br/>Messages/day: ${p.data.messagesPerDay.toFixed(2)}<br/>Words/day: ${p.data.wordsPerDay.toFixed(2)}<br/>Msgs/word: ${p.data.mpw.toFixed(2)}`
       },
       xAxis: {
         type: "value",
-        name: "Messages",
+        name: "Messages/day",
         axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
         axisLine: { lineStyle: { color: palette.subtext } }
       },
       yAxis: {
         type: "value",
-        name: "Words",
+        name: "Words/day",
         axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
         axisLine: { lineStyle: { color: palette.subtext } }
       },
@@ -198,12 +213,12 @@ async function fetchConflicts() {
         {
           type: "scatter",
           data: rows.map(r => ({
-            value: [r.messages, r.words],
+            value: [r.messagesPerDay, r.wordsPerDay],
             sender: r.sender,
-            messages: r.messages,
-            words: r.words,
-            wpm: r.wpm,
-            symbolSize: Math.max(20, Math.min(80, r.wpm * 5)),
+            messagesPerDay: r.messagesPerDay,
+            wordsPerDay: r.wordsPerDay,
+            mpw: r.mpw,
+            symbolSize: Math.max(20, Math.min(80, r.mpw * 200)),
             itemStyle: { color: colorMap[r.sender] }
           })),
           label: { show: true, formatter: (p:any) => p.data.sender, color: palette.text }
@@ -347,20 +362,7 @@ async function fetchConflicts() {
                 <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-              <Card title="Messages" tooltip="Total messages exchanged in selected date range">
-                <div className="text-2xl font-bold">{filteredTotals.messages}</div>
-              </Card>
-              <Card title="Words" tooltip="Total words sent in selected date range">
-                <div className="text-2xl font-bold">{filteredTotals.words}</div>
-              </Card>
-              <Card title="We-ness ratio" tooltip="Share of 'we/us/our' versus first-person pronouns">
-                <div className="text-2xl font-bold">{kpis.we_ness_ratio.toFixed(2)}</div>
-              </Card>
-              <Card title="Profanity hits" tooltip="Count of messages containing common profanity">
-                <div className="text-2xl font-bold">{kpis.profanity_hits}</div>
-              </Card>
-            </div>
+            <KpiStrip kpis={kpis} startDate={startDate} endDate={endDate} />
           </section>
           <section id="timeline" className="mt-6">
             <Card title="Timeline">
@@ -385,8 +387,8 @@ async function fetchConflicts() {
               </Card>
             </div>
             <div>
-              <Card title="Words per message">
-                <Chart option={wordsPerMessageOption()} height={260} />
+              <Card title="Messages vs Words per Day">
+                <Chart option={messagesWordsPerDayOption()} height={260} />
               </Card>
             </div>
             <div>
