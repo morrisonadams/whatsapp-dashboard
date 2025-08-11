@@ -7,17 +7,3 @@ body {
   color: var(--text-color);
   background-color: var(--bg-color);
 }
-
-@keyframes smoke {
-  from {
-    background-position: 0 0;
-  }
-  to {
-    background-position: 200% 200%;
-  }
-}
-
-.smoke-animation {
-  background-size: 200% 200%;
-  animation: smoke 60s linear infinite;
-}
