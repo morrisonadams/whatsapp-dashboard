@@ -3,12 +3,12 @@
 @tailwind utilities;
 
 :root {
-  /* Static dark theme inspired by GPT5 dark mode */
-  --bg-color: #202123;
-  --text-color: #e5e7eb;
-  --sub-color: #4b5563;
-  --sub-alt-color: #2a2b32;
-  --main-color: #10a37f;
+  /* Deep navy theme with accent blooms */
+  --bg-color: #0b0e1c;
+  --text-color: #e2e8f0;
+  --sub-color: #94a3b8;
+  --sub-alt-color: rgba(255,255,255,0.05);
+  --main-color: #5eead4;
 }
 
 body {

@@ -5,20 +5,20 @@ export interface Palette {
   series: string[];
 }
 
-// Static dark palette similar to GPT5 dark mode
+// Palette tuned for the new gradient theme
 const palette: Palette = {
-  text: "#e5e7eb",
-  subtext: "#9ca3af",
-  surfaces: "#2a2b32",
+  text: "#e2e8f0",
+  subtext: "#94a3b8",
+  surfaces: "rgba(255,255,255,0.05)",
   series: [
-    "#10A37F",
-    "#7AA2F7",
-    "#FF7B72",
-    "#F6C177",
-    "#C4B5FD",
+    "#5EEAD4",
+    "#A78BFA",
     "#F472B6",
-    "#93C5FD",
-    "#FACC15"
+    "#34D399",
+    "#818CF8",
+    "#FB7185",
+    "#2DD4BF",
+    "#C084FC"
   ]
 };
 
