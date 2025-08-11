@@ -104,12 +104,10 @@ async function fetchConflicts() {
     return map;
   }, [participants, palette]);
 
-
   const allConflicts = useMemo(() => conflicts.flatMap(p => p.conflicts || []), [conflicts]);
   const wordCloudParticipants = participants.slice(0, 2);
   const wordCategories = ["emoji", "swear", "sexual", "space"];
   const [wordFilters, setWordFilters] = useState<string[]>([]);
-
 
   const dateFilter = (day: string) => {
     if (startDate && day < startDate) return false;
@@ -479,28 +477,28 @@ async function fetchConflicts() {
     };
   };
 
-  const profanityAffectionOption = () => {
-    const days = Array.from(new Set((kpis?.timeline_messages || []).filter((r:any)=>dateFilter(r.day)).map((r:any)=>r.day))).sort();
-    const msgPerDay = days.map(d => (kpis?.timeline_messages || []).filter((r:any)=>r.day===d).reduce((s:number,r:any)=>s+r.messages,0));
-    const totalMsgs = filteredTotals.messages || 1;
-    const profTotal = kpis?.profanity_hits || 0;
-    const affTotal = kpis?.affection_hits || 0;
-    const profTrend = msgPerDay.map(c => (c / totalMsgs) * profTotal);
-    const affTrend = msgPerDay.map(c => (c / totalMsgs) * affTotal);
+  const wordCloudOption = (person: string) => {
+    const raw = (kpis?.word_cloud?.[person] || []) as Array<{name:string; value:number; tags?:string[]}>;
+    const data = (wordFilters.length
+      ? raw.filter(r => (r.tags || []).some(t => wordFilters.includes(t)))
+      : raw)
+      .slice(0, 50);
     return {
       backgroundColor: "transparent",
-      textStyle: { color: palette.text },
-      tooltip: { valueFormatter: (v:number)=>formatNumber(Math.round(v)) },
-      legend: { data:["Profanity","Affection"], textStyle:{color: palette.text} },
-      xAxis: { type:"category", data: days, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type:"value", axisLabel:{color: palette.text, formatter:(v:number)=>formatNumber(Math.round(v))}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series: [
-        { name:"Profanity", type:"line", smooth:true, data: profTrend, lineStyle:{width:2,color:palette.series[2]} },
-        { name:"Affection", type:"line", smooth:true, data: affTrend, lineStyle:{width:2,color:palette.series[3]} }
-      ]
+      tooltip: {},
+      series: [{
+        type: 'wordCloud',
+        gridSize: 8,
+        sizeRange: [12, 50],
+        rotationRange: [0, 0],
+        textStyle: {
+          color: colorMap[person],
+          fontFamily: "'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji','Android Emoji','EmojiSymbols','EmojiOne','Twemoji','sans-serif'"
+        },
+        data
+      }]
     };
   };
-
 
   const affSplit = (kpis?.affection_split ?? []) as Array<{sender:string; affection:number}>;
   const qSplit = (kpis?.questions_split ?? []) as Array<{sender:string; questions:number; unanswered_15m:number}>;
@@ -534,43 +532,17 @@ async function fetchConflicts() {
   return (
     <DateRangeContext.Provider value={{ startDate, endDate, setStartDate, setEndDate }}>
     <>
-      <div className="col-span-12 flex flex-wrap items-center gap-4 justify-between">
-        <div className="flex items-end gap-4">
-          <div>
-            <label className="text-sm mr-2">Start</label>
-            <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
-          </div>
-          <div>
-            <label className="text-sm mr-2">End</label>
-            <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {participants.map(p => (
-            <span key={p} className="flex items-center text-xs gap-1">
-              <span className="w-3 h-3 rounded-full" style={{backgroundColor: colorMap[p]}}></span>
-              {p}
-            </span>
-          ))}
-          <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer ml-4">
-            {busy ? "Uploading..." : "Upload chat"}
-            <input type="file" className="hidden" accept=".txt" onChange={(e)=>e.target.files&&onUpload(e.target.files[0])} />
-          </label>
-        </div>
+      <div className="flex items-center justify-end">
+        <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
+          {busy ? "Uploading..." : "Upload chat"}
+          <input type="file" className="hidden" accept=".txt" onChange={(e)=>e.target.files&&onUpload(e.target.files[0])} />
+        </label>
       </div>
-      {err && <div className="col-span-12 text-red-400">{err}</div>}
-      {conflictErr && <div className="col-span-12 text-red-400">{conflictErr}</div>}
-      {!kpis && <div className="col-span-12 text-gray-300">Load sample or upload a WhatsApp export.</div>}
+      {err && <div className="text-red-400">{err}</div>}
+      {conflictErr && <div className="text-red-400">{conflictErr}</div>}
+      {!kpis && <div className="text-gray-300">Load sample or upload a WhatsApp export.</div>}
       {kpis && (
         <>
-          <div className="col-span-12 grid grid-cols-12 gap-4">
-            <div className="col-span-3">
-              <Card title="Messages" tooltip="Total messages exchanged in selected date range">
-                <div className="text-2xl font-bold">{filteredTotals.messages}</div>
-              </Card>
-            </div>
-            <div className="col-span-3">
-              <Card title="Words" tooltip="Total words sent in selected date range">
           <section id="overview" className="space-y-4">
             <div className="flex flex-col md:flex-row gap-2 md:items-end">
               <div>
@@ -606,84 +578,6 @@ async function fetchConflicts() {
               <Card title="Words" tooltip="Total words sent in selected date range">
                 <div className="text-2xl font-bold">{formatNumber(filteredTotals.words)}</div>
               </Card>
-            </div>
-            <div className="col-span-3">
-              <Card title="We-ness ratio" tooltip="Share of 'we/us/our' versus first-person pronouns">
-                <div className="text-2xl font-bold">{kpis.we_ness_ratio.toFixed(2)}</div>
-              </Card>
-            </div>
-            <div className="col-span-3">
-              <Card title="Profanity hits" tooltip="Count of messages containing common profanity">
-                <div className="text-2xl font-bold">{kpis.profanity_hits}</div>
-              </Card>
-            </div>
-          </div>
-
-          <div className="col-span-12">
-            <Card title="Timeline">
-              <div className="flex gap-2 mb-2 items-center">
-                <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
-                <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
-                <label className="flex items-center text-sm ml-auto">
-                  <input type="checkbox" className="mr-1" checked={showTrend} onChange={e=>setShowTrend(e.target.checked)} />
-                  Trend
-                </label>
-              </div>
-              <Chart option={timelineOption()} height={360} onEvents={{ datazoom: handleZoom }} />
-              {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
-            </Card>
-          </div>
-
-          <div className="col-span-6">
-            <Card title="Messages by sender">
-              <Chart option={messagesOption()} height={260} />
-            </Card>
-          </div>
-          <div className="col-span-6">
-            <Card title="Words by sender">
-              <Chart option={wordsOption()} height={260} />
-            </Card>
-          </div>
-
-          <div className="col-span-6">
-            <Card title="Words per message">
-              <Chart option={wordsPerMessageOption()} height={260} />
-            </Card>
-          </div>
-          <div className="col-span-6">
-            <Card title="Seconds to reply">
-              <Chart option={replyOption()} height={260} />
-              {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
-            </Card>
-          </div>
-
-          <div className="col-span-12">
-            <Card title="Daily rhythm heatmap (weekday × hour)">
-              <div className="flex gap-2 mb-2">
-                <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
-                {participants.map(p => (
-                  <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
-                ))}
-              </div>
-              <Chart option={heatOption()} height={360} />
-            </Card>
-          </div>
-
-          <div className="col-span-6">
-            <Card title="Profanity vs affection over time">
-              <Chart option={profanityAffectionOption()} height={260} />
-            </Card>
-          </div>
-          <div className="col-span-6 grid grid-cols-12 gap-4">
-            <div className="col-span-12">
-              <Card title="Conflicts per month">
-                {conflictProgress && <div className="text-sm text-gray-400 mb-2">Analyzing {conflictProgress.current}/{conflictProgress.total} segments...</div>}
-                <Chart option={conflictBarOption()} height={200} onEvents={{ click: onConflictBarClick }} />
-                {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
-              </Card>
-            </div>
-            <div className="col-span-12">
-              <Card title={selectedConflict ? `Conflicts in ${selectedConflict.month}` : "Conflict details"}>
               <Card title="We-ness /1k words" tooltip="Occurrences of 'we/us/our' per 1,000 words compared to previous period">
                 <div className="text-2xl font-bold">{weProfMetrics.we.toFixed(2)}</div>
                 {startDate && endDate && <div className="text-sm text-gray-300">{weProfMetrics.weDelta>=0?"+":""}{weProfMetrics.weDelta.toFixed(2)}</div>}
@@ -814,16 +708,6 @@ async function fetchConflicts() {
                 )}
               </Card>
             </div>
-          </div>
-          <div className="col-span-12">
-            <Card title="Conflict timeline">
-              <Chart option={conflictTimelineOption()} height={200} />
-              {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
-            </Card>
-          </div>
-        </>
-      )}
-      <div className="col-span-12 text-xs text-gray-400">v0.2.9 — visual refinements • API v{apiVersion}</div>
             <Card title="Conflict timeline" tooltip="Chronological scatter of detected conflicts">
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}

@@ -26,7 +26,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </header>
         <div className="flex relative z-10">
           <Sidebar />
-          <main className="flex-1 p-6 grid grid-cols-12 gap-6">
+          <main className="flex-1 p-6 space-y-6">
             {children}
           </main>
         </div>
