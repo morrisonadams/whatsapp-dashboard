@@ -4,6 +4,7 @@ import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
 import useThemePalette from "@/lib/useThemePalette";
+import SenderShareChart from "@/components/SenderShareChart";
 
 type KPI = any;
 const formatNumber = (n: number) => n.toLocaleString();
@@ -111,6 +112,11 @@ async function fetchConflicts() {
     const totalWords = (kpis.timeline_words || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.words,0);
     return { messages: totalMessages, words: totalWords };
   }, [kpis, startDate, endDate]);
+
+  const timelineData = useMemo(() => {
+    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
+    return (kpis?.[key] || []).filter((r: any) => dateFilter(r.day));
+  }, [kpis, timelineMetric, startDate, endDate]);
 
   const handleZoom = (e: any) => {
     const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
@@ -507,6 +513,12 @@ async function fetchConflicts() {
               <Card title="Seconds to reply">
                 <Chart option={replyOption()} height={260} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+              </Card>
+            </div>
+            <div>
+              <Card title="Sender share over time">
+                <SenderShareChart data={timelineData} participants={participants} colorMap={colorMap} zoomRange={zoomRange} />
+                {timelineData.length === 0 && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
               </Card>
             </div>
           </section>
