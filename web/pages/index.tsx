@@ -357,7 +357,7 @@ async function fetchConflicts() {
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[3] }, barWidth: "60%" }],
+      series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[2] }, barWidth: "60%" }],
       grid: { left: 40, right: 20, top: 20, bottom: 60 }
     };
   };
@@ -379,7 +379,7 @@ async function fetchConflicts() {
       },
       xAxis: { type: "time", axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       yAxis: { show: false },
-      series: [{ type: "scatter", symbolSize:8, data: pts.map(p=>({ value:[p.date,1], date:p.date, summary:p.summary })), itemStyle:{ color: palette.series[3] } }]
+      series: [{ type: "scatter", symbolSize:8, data: pts.map(p=>({ value:[p.date,1], date:p.date, summary:p.summary })), itemStyle:{ color: palette.series[2] } }]
     };
   };
 
