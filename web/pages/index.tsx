@@ -5,6 +5,7 @@ import Card from "@/components/Card";
 import Chart from "@/components/Chart";
 import MessageWordBySender from "@/components/MessageWordBySender";
 import useThemePalette from "@/lib/useThemePalette";
+import DeltaBadge from "@/components/DeltaBadge";
 import ConflictTimelineStrip from "@/components/ConflictTimelineStrip";
 import ConflictCardList from "@/components/ConflictCardList";
 import { useParticipantColors } from "@/lib/ParticipantColors";
@@ -32,6 +33,10 @@ export default function Home() {
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
   const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
+  const [compareMode, setCompareMode] = useState(false);
+  const palette = useThemePalette();
+  const { start: startDate, end: endDate } = dateRange;
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const palette = useThemePalette();
@@ -47,10 +52,10 @@ export default function Home() {
     if (!kpis) return;
     const days = (kpis.timeline_messages || []).map((r:any)=>r.day).sort();
     if (days.length) {
-      setStartDate(days[0]);
-      setEndDate(days[days.length - 1]);
+      setDateRange({ start: days[0], end: days[days.length - 1] });
     }
   }, [kpis]);
+
 
   useEffect(() => {
     const ps = kpis?.participants ?? (kpis?.by_sender?.map((r:any)=>r.sender) ?? []);
@@ -138,6 +143,30 @@ async function fetchConflicts() {
     return { messages: totalMessages, words: totalWords };
   }, [kpis, startDate, endDate]);
 
+  const prevRange = useMemo(() => {
+    if (!startDate || !endDate) return null;
+    const start = new Date(startDate + "T00:00:00Z");
+    const end = new Date(endDate + "T00:00:00Z");
+    const diff = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+    const prevEnd = new Date(start.getTime() - 86400000);
+    const prevStart = new Date(prevEnd.getTime() - (diff - 1) * 86400000);
+    return {
+      start: prevStart.toISOString().slice(0, 10),
+      end: prevEnd.toISOString().slice(0, 10),
+    };
+  }, [startDate, endDate]);
+
+  const prevTotals = useMemo(() => {
+    if (!kpis || !prevRange) return { messages: 0, words: 0 };
+    const totalMessages = (kpis.timeline_messages || []).filter((r:any)=>r.day>=prevRange.start && r.day<=prevRange.end).reduce((s:number,r:any)=>s+r.messages,0);
+    const totalWords = (kpis.timeline_words || []).filter((r:any)=>r.day>=prevRange.start && r.day<=prevRange.end).reduce((s:number,r:any)=>s+r.words,0);
+    return { messages: totalMessages, words: totalWords };
+  }, [kpis, prevRange]);
+
+  const deltaTotals = useMemo(() => ({
+    messages: filteredTotals.messages - prevTotals.messages,
+    words: filteredTotals.words - prevTotals.words,
+  }), [filteredTotals, prevTotals]);
 
   const weProfMetrics = useMemo(() => {
     if (!kpis) return { we: 0, prof: 0, weDelta: 0, profDelta: 0 };
@@ -172,11 +201,16 @@ async function fetchConflicts() {
   const handleZoom = (e: any) => {
     const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
     if (dz.start == null || dz.end == null) return;
+    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
+    const tl = (kpis?.[key] || []);
+    const days: string[] = Array.from(new Set<string>(tl.map((r:any)=>r.day))).sort();
+    if (days.length < 2) return;
+    const len = days.length - 1;
     if (heatDays.length < 2) return;
     const len = heatDays.length - 1;
     const startIdx = Math.round((dz.start / 100) * len);
     const endIdx = Math.round((dz.end / 100) * len);
-    setZoomRange([startIdx, endIdx]);
+    setDateRange({ start: days[startIdx] || "", end: days[endIdx] || "" });
   };
 
   const messagesOption = () => {
@@ -285,10 +319,12 @@ async function fetchConflicts() {
 
   const timelineOption = () => {
     const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
-    const tlAll = (kpis?.[key] || []).filter((r:any)=>dateFilter(r.day));
+    const tlAll = (kpis?.[key] || []);
     const allDays: string[] = Array.from(new Set<string>(tlAll.map((r:any)=>r.day))).sort();
-    let startIdx = zoomRange ? zoomRange[0] : 0;
-    let endIdx = zoomRange ? zoomRange[1] : allDays.length - 1;
+    let startIdx = startDate ? allDays.indexOf(startDate) : 0;
+    let endIdx = endDate ? allDays.indexOf(endDate) : allDays.length - 1;
+    startIdx = startIdx < 0 ? 0 : startIdx;
+    endIdx = endIdx < 0 ? allDays.length - 1 : endIdx;
     startIdx = Math.max(0, Math.min(startIdx, allDays.length - 1));
     endIdx = Math.max(0, Math.min(endIdx, allDays.length - 1));
     if (endIdx < startIdx) endIdx = startIdx;
@@ -511,14 +547,31 @@ async function fetchConflicts() {
             <div className="flex flex-col md:flex-row gap-2 md:items-end">
               <div>
                 <label className="text-sm mr-2">Start</label>
-                <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
+                <input type="date" value={startDate} onChange={e=>setDateRange(r=>({...r,start:e.target.value}))} className="bg-white/10 rounded px-2 py-1" />
               </div>
               <div>
                 <label className="text-sm mr-2">End</label>
-                <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
+                <input type="date" value={endDate} onChange={e=>setDateRange(r=>({...r,end:e.target.value}))} className="bg-white/10 rounded px-2 py-1" />
               </div>
+              <label className="flex items-center text-sm ml-auto">
+                <input type="checkbox" className="mr-1" checked={compareMode} onChange={e=>setCompareMode(e.target.checked)} />
+                Compare
+              </label>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+              <Card
+                title="Messages"
+                tooltip="Total messages exchanged in selected date range"
+                badge={compareMode && prevRange ? <DeltaBadge value={deltaTotals.messages} /> : undefined}
+              >
+                <div className="text-2xl font-bold">{filteredTotals.messages}</div>
+              </Card>
+              <Card
+                title="Words"
+                tooltip="Total words sent in selected date range"
+                badge={compareMode && prevRange ? <DeltaBadge value={deltaTotals.words} /> : undefined}
+              >
+                <div className="text-2xl font-bold">{filteredTotals.words}</div>
               <Card title="Messages" tooltip="Total messages exchanged in selected date range">
                 <div className="text-2xl font-bold">{formatNumber(filteredTotals.messages)}</div>
               </Card>
@@ -553,17 +606,27 @@ async function fetchConflicts() {
                 <MessageWordBySender rows={filteredBySender} />
           <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 xl:grid-rows-5 gap-6">
             <div>
-              <Card title="Messages by sender" tooltip="Total messages per participant in selected range">
+              <Card
+                title="Messages by sender"
+                badge={compareMode && prevRange ? <DeltaBadge value={deltaTotals.messages} /> : undefined}
+              >
+
                 <Chart option={messagesOption()} height={260} />
               </Card>
             </div>
             <div>
-              <Card title="Words by sender" tooltip="Total words per participant in selected range">
+              <Card
+                title="Words by sender"
+                badge={compareMode && prevRange ? <DeltaBadge value={deltaTotals.words} /> : undefined}
+              >
                 <Chart option={wordsOption()} height={260} />
               </Card>
             </div>
             <div className="xl:row-span-2">
-              <Card title="Timeline" tooltip="Daily or weekly counts of messages or words">
+              <Card
+                title="Timeline"
+                badge={compareMode && prevRange ? <DeltaBadge value={timelineMetric === "messages" ? deltaTotals.messages : deltaTotals.words} /> : undefined}
+              >
                 <div className="flex gap-2 mb-2 items-center">
                   <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
                   <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
