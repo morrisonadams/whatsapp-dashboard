@@ -3,8 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
+import MessageWordBySender from "@/components/MessageWordBySender";
 import useThemePalette from "@/lib/useThemePalette";
 import DeltaBadge from "@/components/DeltaBadge";
+import ConflictTimelineStrip from "@/components/ConflictTimelineStrip";
+import ConflictCardList from "@/components/ConflictCardList";
+import { useParticipantColors } from "@/lib/ParticipantColors";
+import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
+import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
+import UnifiedTimeline from "@/components/UnifiedTimeline";
+import KpiStrip from "@/components/KpiStrip";
+import useThemePalette from "@/lib/useThemePalette";
+import SenderShareChart from "@/components/SenderShareChart";
+import { DateRangeContext } from "@/lib/DateRangeContext";
 
 type KPI = any;
 const formatNumber = (n: number) => n.toLocaleString();
@@ -18,6 +29,7 @@ export default function Home() {
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
+  const [conflictDateFilter, setConflictDateFilter] = useState<string | null>(null);
   const [timelineMetric, setTimelineMetric] = useState<"messages" | "words">("messages");
   const [showTrend, setShowTrend] = useState(false);
   const [heatPerson, setHeatPerson] = useState<string>("All");
@@ -25,6 +37,10 @@ export default function Home() {
   const [compareMode, setCompareMode] = useState(false);
   const palette = useThemePalette();
   const { start: startDate, end: endDate } = dateRange;
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
+  const palette = useThemePalette();
+  const { participants, colorMap, setParticipants } = useParticipantColors();
 
   useEffect(() => {
     fetch((process.env.NEXT_PUBLIC_API_BASE||"http://localhost:8000")+"/version")
@@ -40,10 +56,22 @@ export default function Home() {
     }
   }, [kpis]);
 
+
+  useEffect(() => {
+    const ps = kpis?.participants ?? (kpis?.by_sender?.map((r:any)=>r.sender) ?? []);
+    setParticipants(ps);
+  }, [kpis, setParticipants]);
+
+   useEffect(() => {
+    setZoomRange(null);
+  }, [timelineMetric, startDate, endDate, kpis]);
+
+
 async function fetchConflicts() {
   try {
     const p = await getConflicts((current,total)=>setConflictProgress({current,total}));
     setConflicts(p);
+    setConflictDateFilter(null);
     setSelectedConflict(null);
     setConflictErr(null);
   } catch (e: any) {
@@ -76,6 +104,7 @@ async function fetchConflicts() {
     return map;
   }, [participants, palette]);
 
+  const allConflicts = useMemo(() => conflicts.flatMap(p => p.conflicts || []), [conflicts]);
   const wordCloudParticipants = participants.slice(0, 2);
   const wordCategories = ["emoji", "swear", "sexual", "space"];
   const [wordFilters, setWordFilters] = useState<string[]>([]);
@@ -85,6 +114,12 @@ async function fetchConflicts() {
     if (endDate && day > endDate) return false;
     return true;
   };
+
+  const heatDays = useMemo<string[]>(() => {
+    const key = timelineMetric === "messages" ? "timeline_messages" : "timeline_words";
+    const tl = (kpis?.[key] || []).filter((r:any) => dateFilter(r.day));
+    return Array.from(new Set(tl.map((r:any)=>r.day))).sort() as string[];
+  }, [kpis, timelineMetric, startDate, endDate]);
 
   const filteredBySender = useMemo(() => {
     if (!kpis) return [] as Array<any>;
@@ -133,6 +168,36 @@ async function fetchConflicts() {
     words: filteredTotals.words - prevTotals.words,
   }), [filteredTotals, prevTotals]);
 
+  const weProfMetrics = useMemo(() => {
+    if (!kpis) return { we: 0, prof: 0, weDelta: 0, profDelta: 0 };
+    const weTotal = (kpis.timeline_we || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.we,0);
+    const profTotal = (kpis.timeline_profanity || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.profanity,0);
+    const curWords = filteredTotals.words || 0;
+    const weRate = curWords ? (weTotal / curWords) * 1000 : 0;
+    const profRate = curWords ? (profTotal / curWords) * 1000 : 0;
+
+    if (!startDate || !endDate) {
+      return { we: weRate, prof: profRate, weDelta: 0, profDelta: 0 };
+    }
+
+    const dayMs = 86400000;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const span = Math.round((end.getTime() - start.getTime()) / dayMs) + 1;
+    const prevEnd = new Date(start.getTime() - dayMs);
+    const prevStart = new Date(prevEnd.getTime() - (span - 1) * dayMs);
+    const ps = prevStart.toISOString().slice(0,10);
+    const pe = prevEnd.toISOString().slice(0,10);
+    const prevFilter = (day: string) => day >= ps && day <= pe;
+    const prevWe = (kpis.timeline_we || []).filter((r:any)=>prevFilter(r.day)).reduce((s:number,r:any)=>s+r.we,0);
+    const prevProf = (kpis.timeline_profanity || []).filter((r:any)=>prevFilter(r.day)).reduce((s:number,r:any)=>s+r.profanity,0);
+    const prevWords = (kpis.timeline_words || []).filter((r:any)=>prevFilter(r.day)).reduce((s:number,r:any)=>s+r.words,0);
+    const prevWeRate = prevWords ? (prevWe / prevWords) * 1000 : 0;
+    const prevProfRate = prevWords ? (prevProf / prevWords) * 1000 : 0;
+    return { we: weRate, prof: profRate, weDelta: weRate - prevWeRate, profDelta: profRate - prevProfRate };
+  }, [kpis, startDate, endDate, filteredTotals]);
+
+
   const handleZoom = (e: any) => {
     const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
     if (dz.start == null || dz.end == null) return;
@@ -141,6 +206,8 @@ async function fetchConflicts() {
     const days: string[] = Array.from(new Set<string>(tl.map((r:any)=>r.day))).sort();
     if (days.length < 2) return;
     const len = days.length - 1;
+    if (heatDays.length < 2) return;
+    const len = heatDays.length - 1;
     const startIdx = Math.round((dz.start / 100) * len);
     const endIdx = Math.round((dz.end / 100) * len);
     setDateRange({ start: days[startIdx] || "", end: days[endIdx] || "" });
@@ -153,7 +220,7 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
-      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
+      yAxis: { type: "value", name: "Messages", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
       series: [
         {
           type: "bar",
@@ -171,7 +238,7 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
-      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
+      yAxis: { type: "value", name: "Words", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
       series: [
         {
           type: "bar",
@@ -182,6 +249,7 @@ async function fetchConflicts() {
     };
   };
 
+  const wordsPerMessageOption = () => {
   const replyOption = () => {
     const rs = (kpis?.reply_simple || []) as Array<any>;
     return {
@@ -189,7 +257,7 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: participants, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: "Seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: [
         {
           type: "bar",
@@ -203,28 +271,31 @@ async function fetchConflicts() {
     };
   };
 
-  const wordsPerMessageOption = () => {
+  const messagesWordsPerDayOption = () => {
+    const daySet = new Set<string>();
+    (kpis?.timeline_messages || []).forEach((r:any)=>{ if(dateFilter(r.day)) daySet.add(r.day); });
+    const days = daySet.size || 1;
     const rows = filteredBySender.map(r => ({
       sender: r.sender,
-      messages: r.messages,
-      words: r.words,
-      wpm: r.messages ? r.words / r.messages : 0
+      messagesPerDay: r.messages / days,
+      wordsPerDay: r.words / days,
+      mpw: r.words ? r.messages / r.words : 0
     }));
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: {
-        formatter: (p: any) => `${p.data.sender}<br/>Messages: ${formatNumber(p.data.messages)}<br/>Words: ${formatNumber(p.data.words)}<br/>Words/msg: ${p.data.wpm.toFixed(2)}`
+        formatter: (p: any) => `${p.data.sender}<br/>Messages/day: ${p.data.messagesPerDay.toFixed(2)}<br/>Words/day: ${p.data.wordsPerDay.toFixed(2)}<br/>Msgs/word: ${p.data.mpw.toFixed(2)}`
       },
       xAxis: {
         type: "value",
-        name: "Messages",
+        name: "Messages/day",
         axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
         axisLine: { lineStyle: { color: palette.subtext } }
       },
       yAxis: {
         type: "value",
-        name: "Words",
+        name: "Words/day",
         axisLabel: { color: palette.text, formatter: (v:number) => formatNumber(v) },
         axisLine: { lineStyle: { color: palette.subtext } }
       },
@@ -232,12 +303,12 @@ async function fetchConflicts() {
         {
           type: "scatter",
           data: rows.map(r => ({
-            value: [r.messages, r.words],
+            value: [r.messagesPerDay, r.wordsPerDay],
             sender: r.sender,
-            messages: r.messages,
-            words: r.words,
-            wpm: r.wpm,
-            symbolSize: Math.max(20, Math.min(80, r.wpm * 5)),
+            messagesPerDay: r.messagesPerDay,
+            wordsPerDay: r.wordsPerDay,
+            mpw: r.mpw,
+            symbolSize: Math.max(20, Math.min(80, r.mpw * 200)),
             itemStyle: { color: colorMap[r.sender] }
           })),
           label: { show: true, formatter: (p:any) => p.data.sender, color: palette.text }
@@ -342,7 +413,7 @@ async function fetchConflicts() {
       ],
       legend: { data: senders, textStyle:{color: palette.text} },
       xAxis: { type: "category", data: axis, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: timelineMetric === "messages" ? "Messages" : "Words", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series
     };
   };
@@ -360,8 +431,8 @@ async function fetchConflicts() {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: hours, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "category", data: weekdays, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      xAxis: { type: "category", name: "Hour", data: hours, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "category", name: "Weekday", data: weekdays, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       visualMap: { min: 0, max: vmax, calculable: true, orient:"horizontal", left:"center", textStyle:{color: palette.text}, inRange:{color:[palette.series[0], palette.series[1], palette.series[5]]} },
       series: [{
         type: "heatmap",
@@ -379,7 +450,7 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: "Conflicts", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[2] }, barWidth: "60%" }],
       grid: { left: 40, right: 20, top: 20, bottom: 60 }
     };
@@ -451,12 +522,15 @@ async function fetchConflicts() {
     });
     return (
       <div className="mt-2 text-sm text-gray-300 grid grid-cols-2 gap-2">
-        {rows.map(r => <div key={r.sender} className="flex items-center justify-between"><span>{r.sender}</span><span className="font-semibold">{r.value}</span></div>)}
+        {rows.map(r => (
+          <div key={r.sender} className="flex items-center justify-between"><span>{r.sender}</span><span className="font-semibold">{formatNumber(r.value)}</span></div>
+        ))}
       </div>
     );
   };
 
   return (
+    <DateRangeContext.Provider value={{ startDate, endDate, setStartDate, setEndDate }}>
     <>
       <div className="flex items-center justify-end">
         <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
@@ -498,22 +572,45 @@ async function fetchConflicts() {
                 badge={compareMode && prevRange ? <DeltaBadge value={deltaTotals.words} /> : undefined}
               >
                 <div className="text-2xl font-bold">{filteredTotals.words}</div>
+              <Card title="Messages" tooltip="Total messages exchanged in selected date range">
+                <div className="text-2xl font-bold">{formatNumber(filteredTotals.messages)}</div>
               </Card>
-              <Card title="We-ness ratio" tooltip="Share of 'we/us/our' versus first-person pronouns">
-                <div className="text-2xl font-bold">{kpis.we_ness_ratio.toFixed(2)}</div>
+              <Card title="Words" tooltip="Total words sent in selected date range">
+                <div className="text-2xl font-bold">{formatNumber(filteredTotals.words)}</div>
               </Card>
-              <Card title="Profanity hits" tooltip="Count of messages containing common profanity">
-                <div className="text-2xl font-bold">{kpis.profanity_hits}</div>
+              <Card title="We-ness /1k words" tooltip="Occurrences of 'we/us/our' per 1,000 words compared to previous period">
+                <div className="text-2xl font-bold">{weProfMetrics.we.toFixed(2)}</div>
+                {startDate && endDate && <div className="text-sm text-gray-300">{weProfMetrics.weDelta>=0?"+":""}{weProfMetrics.weDelta.toFixed(2)}</div>}
+              </Card>
+              <Card title="Profanity /1k words" tooltip="Messages with profanity per 1,000 words compared to previous period">
+                <div className="text-2xl font-bold">{weProfMetrics.prof.toFixed(2)}</div>
+                {startDate && endDate && <div className="text-sm text-gray-300">{weProfMetrics.profDelta>=0?"+":""}{weProfMetrics.profDelta.toFixed(2)}</div>}
               </Card>
             </div>
+            <KpiStrip kpis={kpis} startDate={startDate} endDate={endDate} />
+          </section>
+          <section id="timeline" className="mt-6">
+            <Card title="Timeline">
+              <UnifiedTimeline
+                timelineMessages={kpis.timeline_messages || []}
+                timelineWords={kpis.timeline_words || []}
+                conflictDates={conflictDates}
+                affectionDates={affectionDates}
+              />
+            </Card>
           </section>
 
           <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div className="xl:col-span-2">
+              <Card title="Messages & words by sender">
+                <MessageWordBySender rows={filteredBySender} />
+          <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 xl:grid-rows-5 gap-6">
             <div>
               <Card
                 title="Messages by sender"
                 badge={compareMode && prevRange ? <DeltaBadge value={deltaTotals.messages} /> : undefined}
               >
+
                 <Chart option={messagesOption()} height={260} />
               </Card>
             </div>
@@ -539,34 +636,65 @@ async function fetchConflicts() {
                   </label>
                 </div>
                 <Chart option={timelineOption()} height={360} onEvents={{ datazoom: handleZoom }} />
+                <ConflictTimelineStrip conflicts={allConflicts} onSelectDate={setConflictDateFilter} />
                 {(!kpis || (kpis[timelineMetric==="messages"?"timeline_messages":"timeline_words"]||[]).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+            <div>
+              <Card title="Messages vs Words per Day">
+                <Chart option={messagesWordsPerDayOption()} height={260} />
               </Card>
             </div>
             <div>
-              <Card title="Words per message">
+              <Card title="Words per message" tooltip="Messages vs words; bubble size shows words per message">
                 <Chart option={wordsPerMessageOption()} height={260} />
               </Card>
             </div>
             <div>
-              <Card title="Seconds to reply">
+              <Card title="Seconds to reply" tooltip="Average time from one person's message to another's reply">
                 <Chart option={replyOption()} height={260} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+              <Card title="Reply time distribution">
+                <ReplyTimeDistribution data={kpis?.reply_pairs || []} startDate={startDate} endDate={endDate} />
+              </Card>
+            </div>
+            <div>
+              <Card title="Sender share over time">
+                <SenderShareChart data={timelineData} participants={participants} colorMap={colorMap} zoomRange={zoomRange} />
+                {timelineData.length === 0 && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
+              </Card>
+            </div>
+            <div id="heatmap" className="xl:col-span-3 xl:row-start-5">
+              <Card title="Daily rhythm heatmap (weekday × hour)">
+                <div className="flex gap-2 mb-2">
+                  <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
+                  {participants.map(p => (
+                    <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
+                  ))}
+                </div>
+                <DailyRhythmHeatmap
+                  data={kpis.heatmap || []}
+                  person={heatPerson}
+                  palette={palette}
+                  days={heatDays}
+                  zoomRange={zoomRange}
+                  startDate={startDate}
+                  endDate={endDate}
+                />
               </Card>
             </div>
           </section>
 
           <section id="conflicts" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card title="Conflicts per month">
+              <Card title="Conflicts per month" tooltip="Number of detected conflict segments each month">
                 {conflictProgress && (
                   <div className="text-sm text-gray-400 mb-2">
-                    Analyzing {conflictProgress.current}/{conflictProgress.total} segments...
+                    Analyzing {formatNumber(conflictProgress.current)}/{formatNumber(conflictProgress.total)} segments...
                   </div>
                 )}
                 <Chart option={conflictBarOption()} height={260} onEvents={{ click: onConflictBarClick }} />
                 {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
               </Card>
-              <Card title={selectedConflict ? `Conflicts in ${selectedConflict.month}` : "Conflict details"}>
+              <Card title={selectedConflict ? `Conflicts in ${selectedConflict.month}` : "Conflict details"} tooltip="Summaries of conflicts for the selected month">
                 {selectedConflict ? (
                   <ul className="text-sm text-gray-300 list-disc ml-5">
                     {selectedConflict.conflicts.map((c:any,i:number)=>(
@@ -580,26 +708,30 @@ async function fetchConflicts() {
                 )}
               </Card>
             </div>
-            <Card title="Conflict timeline">
+            <Card title="Conflict timeline" tooltip="Chronological scatter of detected conflicts">
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
             </Card>
           </section>
 
           <section id="heatmap" className="grid grid-cols-1 gap-6">
-            <Card title="Daily rhythm heatmap (weekday × hour)">
+            <Card title="Daily rhythm heatmap (weekday × hour)" tooltip="Message volume by weekday and hour">
               <div className="flex gap-2 mb-2">
                 <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
                 {participants.map(p => (
                   <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
                 ))}
+            <div className="grid grid-cols-1 lg:grid-cols-6 lg:grid-rows-6">
+              <div className="lg:col-start-2 lg:col-span-5 lg:row-start-6">
+                <Card title="Conflicts">
+                  <ConflictCardList conflicts={allConflicts} filterDate={conflictDateFilter} />
+                </Card>
               </div>
-              <Chart option={heatOption()} height={360} />
-            </Card>
+            </div>
           </section>
 
           <section id="wordcloud" className="grid grid-cols-1 gap-6">
-            <Card title="Word cloud by participant">
+            <Card title="Word cloud by participant" tooltip="Most frequent words or emojis for each participant">
               <div className="mb-2 flex flex-wrap gap-3">
                 {wordCategories.map(cat => (
                   <label key={cat} className="text-xs flex items-center gap-1">
@@ -638,8 +770,8 @@ async function fetchConflicts() {
               title="Questions (total & per person)"
               tooltip="Questions are messages that end with a '?' or start with words like 'who' or 'why'. Marked as unanswered if no one else replies within 15 minutes."
             >
-              <div className="text-3xl">{kpis.questions.total}</div>
-              <div className="text-sm text-gray-300">Unanswered within 15m: {kpis.questions.unanswered_15m}</div>
+              <div className="text-3xl">{formatNumber(kpis.questions.total)}</div>
+              <div className="text-sm text-gray-300">Unanswered within 15m: {formatNumber(kpis.questions.unanswered_15m)}</div>
               {cardSplit("questions")}
               <div className="mt-1 text-sm text-gray-300">Unanswered per person:</div>
               {cardSplit("unanswered")}
@@ -648,14 +780,14 @@ async function fetchConflicts() {
               title="Attachments (total & per person)"
               tooltip="Counts messages that include media or file attachments such as photos, videos, audio, or documents."
             >
-              <div className="text-3xl">{kpis.media_total}</div>
+              <div className="text-3xl">{formatNumber(kpis.media_total)}</div>
               {cardSplit("attachments")}
             </Card>
             <Card
               title="Affection markers (total & per person)"
               tooltip="Messages containing affectionate words or emojis like 'love you', '😘', or '❤️'."
             >
-              <div className="text-3xl">{kpis.affection_hits}</div>
+              <div className="text-3xl">{formatNumber(kpis.affection_hits)}</div>
               {cardSplit("affection")}
             </Card>
           </section>
@@ -663,5 +795,6 @@ async function fetchConflicts() {
         )}
         <div className="text-xs text-gray-400">v0.2.9 — visual refinements • API v{apiVersion}</div>
     </>
+    </DateRangeContext.Provider>
   );
 }
