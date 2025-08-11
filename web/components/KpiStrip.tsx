@@ -50,9 +50,62 @@ export default function KpiStrip({ kpis, startDate, endDate }: Props) {
     ? prevSum(kpis.timeline_words || [], "words", wordAgg.days[0], wordAgg.days.length)
     : 0;
 
+  const wordMap: Record<string, number> = {};
+  wordAgg.days.forEach((d, i) => {
+    wordMap[d] = wordAgg.values[i];
+  });
+
   const delta = (cur: number, prev: number) => (prev > 0 ? ((cur - prev) / prev) * 100 : 0);
 
-  const perK = (count: number) => (totalWords > 0 ? count / (totalWords / 1000) : 0);
+  const perK = (count: number, words = totalWords) =>
+    words > 0 ? count / (words / 1000) : 0;
+
+  const qAgg = aggregate(kpis.timeline_questions || [], "questions", startDate, endDate);
+  const totalQuestions = qAgg.values.reduce((s, n) => s + n, 0);
+  const prevQuestions = qAgg.days.length
+    ? prevSum(kpis.timeline_questions || [], "questions", qAgg.days[0], qAgg.days.length)
+    : 0;
+  const qTrend = wordAgg.days.map((d) => {
+    const idx = qAgg.days.indexOf(d);
+    const cnt = idx >= 0 ? qAgg.values[idx] : 0;
+    return perK(cnt, wordMap[d] || 0);
+  });
+
+  const mediaAgg = aggregate(kpis.timeline_media || [], "media", startDate, endDate);
+  const totalMedia = mediaAgg.values.reduce((s, n) => s + n, 0);
+  const prevMedia = mediaAgg.days.length
+    ? prevSum(kpis.timeline_media || [], "media", mediaAgg.days[0], mediaAgg.days.length)
+    : 0;
+  const mediaTrend = wordAgg.days.map((d) => {
+    const idx = mediaAgg.days.indexOf(d);
+    const cnt = idx >= 0 ? mediaAgg.values[idx] : 0;
+    return perK(cnt, wordMap[d] || 0);
+  });
+
+  const affAgg = aggregate(kpis.timeline_affection || [], "affection", startDate, endDate);
+  const totalAff = affAgg.values.reduce((s, n) => s + n, 0);
+  const prevAff = affAgg.days.length
+    ? prevSum(kpis.timeline_affection || [], "affection", affAgg.days[0], affAgg.days.length)
+    : 0;
+  const affTrend = wordAgg.days.map((d) => {
+    const idx = affAgg.days.indexOf(d);
+    const cnt = idx >= 0 ? affAgg.values[idx] : 0;
+    return perK(cnt, wordMap[d] || 0);
+  });
+
+  const profAgg = aggregate(kpis.timeline_profanity || [], "profanity", startDate, endDate);
+  const totalProf = profAgg.values.reduce((s, n) => s + n, 0);
+  const prevProf = profAgg.days.length
+    ? prevSum(kpis.timeline_profanity || [], "profanity", profAgg.days[0], profAgg.days.length)
+    : 0;
+  const profTrend = wordAgg.days.map((d) => {
+    const idx = profAgg.days.indexOf(d);
+    const cnt = idx >= 0 ? profAgg.values[idx] : 0;
+    return perK(cnt, wordMap[d] || 0);
+  });
+
+  const weRatio = kpis.we_ness_ratio || 0;
+  const wePrev = kpis.prev_we_ness_ratio;
 
   const metrics = [
     {
@@ -60,44 +113,49 @@ export default function KpiStrip({ kpis, startDate, endDate }: Props) {
       value: totalMessages,
       trend: msgAgg.values,
       delta: delta(totalMessages, prevMessages),
-      tooltip: "Total messages exchanged in selected date range",
+      tooltip: "Total messages in range",
     },
     {
       title: "Words",
       value: totalWords,
       trend: wordAgg.values,
       delta: delta(totalWords, prevWords),
-      tooltip: "Total words sent in selected date range",
+      tooltip: "Total words in range",
     },
     {
       title: "We-ness ratio",
-      value: kpis.we_ness_ratio || 0,
-      trend: wordAgg.values.map(() => kpis.we_ness_ratio || 0),
-      tooltip: "Share of 'we/us/our' versus first-person pronouns",
+      value: weRatio,
+      trend: wordAgg.values.map(() => weRatio),
+      delta: wePrev !== undefined ? delta(weRatio, wePrev) : undefined,
+      tooltip: "Share of 'we/us/our' vs 'I/me/my'",
     },
     {
       title: "Questions/1k words",
-      value: perK(kpis.questions?.total || 0),
-      trend: wordAgg.values.map(() => perK(kpis.questions?.total || 0)),
+      value: perK(totalQuestions),
+      trend: qTrend,
+      delta: delta(perK(totalQuestions), perK(prevQuestions, prevWords)),
       tooltip: "Questions per thousand words",
     },
     {
       title: "Attachments/1k words",
-      value: perK(kpis.media_total || 0),
-      trend: wordAgg.values.map(() => perK(kpis.media_total || 0)),
-      tooltip: "Messages with media or files per thousand words",
+      value: perK(totalMedia),
+      trend: mediaTrend,
+      delta: delta(perK(totalMedia), perK(prevMedia, prevWords)),
+      tooltip: "Messages with media or files per 1k words",
     },
     {
       title: "Affection/1k words",
-      value: perK(kpis.affection_hits || 0),
-      trend: wordAgg.values.map(() => perK(kpis.affection_hits || 0)),
-      tooltip: "Affectionate words or emojis per thousand words",
+      value: perK(totalAff),
+      trend: affTrend,
+      delta: delta(perK(totalAff), perK(prevAff, prevWords)),
+      tooltip: "Affectionate terms per 1k words",
     },
     {
       title: "Profanity/1k words",
-      value: perK(kpis.profanity_hits || 0),
-      trend: wordAgg.values.map(() => perK(kpis.profanity_hits || 0)),
-      tooltip: "Common profanity per thousand words",
+      value: perK(totalProf),
+      trend: profTrend,
+      delta: delta(perK(totalProf), perK(prevProf, prevWords)),
+      tooltip: "Profanity hits per 1k words",
     },
   ];
 
