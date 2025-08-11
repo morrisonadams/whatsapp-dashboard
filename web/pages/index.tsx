@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getKPIs, uploadFile, getConflicts } from "@/lib/api";
 import Card from "@/components/Card";
 import Chart from "@/components/Chart";
+import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
 import UnifiedTimeline from "@/components/UnifiedTimeline";
 import KpiStrip from "@/components/KpiStrip";
 import useThemePalette from "@/lib/useThemePalette";
@@ -166,6 +167,7 @@ async function fetchConflicts() {
     };
   };
 
+  const wordsPerMessageOption = () => {
   const replyOption = () => {
     const rs = (kpis?.reply_simple || []) as Array<any>;
     return {
@@ -398,9 +400,8 @@ async function fetchConflicts() {
               </Card>
             </div>
             <div>
-              <Card title="Seconds to reply">
-                <Chart option={replyOption()} height={260} />
-                {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
+              <Card title="Reply time distribution">
+                <ReplyTimeDistribution data={kpis?.reply_pairs || []} startDate={startDate} endDate={endDate} />
               </Card>
             </div>
             <div>
