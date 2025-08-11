@@ -112,6 +112,35 @@ async function fetchConflicts() {
     return { messages: totalMessages, words: totalWords };
   }, [kpis, startDate, endDate]);
 
+  const weProfMetrics = useMemo(() => {
+    if (!kpis) return { we: 0, prof: 0, weDelta: 0, profDelta: 0 };
+    const weTotal = (kpis.timeline_we || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.we,0);
+    const profTotal = (kpis.timeline_profanity || []).filter((r:any)=>dateFilter(r.day)).reduce((s:number,r:any)=>s+r.profanity,0);
+    const curWords = filteredTotals.words || 0;
+    const weRate = curWords ? (weTotal / curWords) * 1000 : 0;
+    const profRate = curWords ? (profTotal / curWords) * 1000 : 0;
+
+    if (!startDate || !endDate) {
+      return { we: weRate, prof: profRate, weDelta: 0, profDelta: 0 };
+    }
+
+    const dayMs = 86400000;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const span = Math.round((end.getTime() - start.getTime()) / dayMs) + 1;
+    const prevEnd = new Date(start.getTime() - dayMs);
+    const prevStart = new Date(prevEnd.getTime() - (span - 1) * dayMs);
+    const ps = prevStart.toISOString().slice(0,10);
+    const pe = prevEnd.toISOString().slice(0,10);
+    const prevFilter = (day: string) => day >= ps && day <= pe;
+    const prevWe = (kpis.timeline_we || []).filter((r:any)=>prevFilter(r.day)).reduce((s:number,r:any)=>s+r.we,0);
+    const prevProf = (kpis.timeline_profanity || []).filter((r:any)=>prevFilter(r.day)).reduce((s:number,r:any)=>s+r.profanity,0);
+    const prevWords = (kpis.timeline_words || []).filter((r:any)=>prevFilter(r.day)).reduce((s:number,r:any)=>s+r.words,0);
+    const prevWeRate = prevWords ? (prevWe / prevWords) * 1000 : 0;
+    const prevProfRate = prevWords ? (prevProf / prevWords) * 1000 : 0;
+    return { we: weRate, prof: profRate, weDelta: weRate - prevWeRate, profDelta: profRate - prevProfRate };
+  }, [kpis, startDate, endDate, filteredTotals]);
+
   const handleZoom = (e: any) => {
     const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
     if (dz.start == null || dz.end == null) return;
@@ -132,7 +161,7 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
-      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
+      yAxis: { type: "value", name: "Messages", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
       series: [
         {
           type: "bar",
@@ -150,7 +179,7 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
-      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
+      yAxis: { type: "value", name: "Words", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
       series: [
         {
           type: "bar",
@@ -168,7 +197,7 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: participants, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: "Seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: [
         {
           type: "bar",
@@ -319,7 +348,7 @@ async function fetchConflicts() {
       ],
       legend: { data: senders, textStyle:{color: palette.text} },
       xAxis: { type: "category", data: axis, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: timelineMetric === "messages" ? "Messages" : "Words", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series
     };
   };
@@ -337,8 +366,8 @@ async function fetchConflicts() {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: hours, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "category", data: weekdays, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      xAxis: { type: "category", name: "Hour", data: hours, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "category", name: "Weekday", data: weekdays, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
       visualMap: { min: 0, max: vmax, calculable: true, orient:"horizontal", left:"center", textStyle:{color: palette.text}, inRange:{color:[palette.series[0], palette.series[1], palette.series[5]]} },
       series: [{
         type: "heatmap",
@@ -356,7 +385,7 @@ async function fetchConflicts() {
       textStyle: { color: palette.text },
       tooltip: { valueFormatter: (value: number) => formatNumber(value) },
       xAxis: { type: "category", data: months, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
+      yAxis: { type: "value", name: "Conflicts", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
       series: [{ type: "bar", data: totals, itemStyle:{ color: palette.series[2] }, barWidth: "60%" }],
       grid: { left: 40, right: 20, top: 20, bottom: 60 }
     };
@@ -428,7 +457,9 @@ async function fetchConflicts() {
     });
     return (
       <div className="mt-2 text-sm text-gray-300 grid grid-cols-2 gap-2">
-        {rows.map(r => <div key={r.sender} className="flex items-center justify-between"><span>{r.sender}</span><span className="font-semibold">{r.value}</span></div>)}
+        {rows.map(r => (
+          <div key={r.sender} className="flex items-center justify-between"><span>{r.sender}</span><span className="font-semibold">{formatNumber(r.value)}</span></div>
+        ))}
       </div>
     );
   };
@@ -459,33 +490,35 @@ async function fetchConflicts() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
               <Card title="Messages" tooltip="Total messages exchanged in selected date range">
-                <div className="text-2xl font-bold">{filteredTotals.messages}</div>
+                <div className="text-2xl font-bold">{formatNumber(filteredTotals.messages)}</div>
               </Card>
               <Card title="Words" tooltip="Total words sent in selected date range">
-                <div className="text-2xl font-bold">{filteredTotals.words}</div>
+                <div className="text-2xl font-bold">{formatNumber(filteredTotals.words)}</div>
               </Card>
-              <Card title="We-ness ratio" tooltip="Share of 'we/us/our' versus first-person pronouns">
-                <div className="text-2xl font-bold">{kpis.we_ness_ratio.toFixed(2)}</div>
+              <Card title="We-ness /1k words" tooltip="Occurrences of 'we/us/our' per 1,000 words compared to previous period">
+                <div className="text-2xl font-bold">{weProfMetrics.we.toFixed(2)}</div>
+                {startDate && endDate && <div className="text-sm text-gray-300">{weProfMetrics.weDelta>=0?"+":""}{weProfMetrics.weDelta.toFixed(2)}</div>}
               </Card>
-              <Card title="Profanity hits" tooltip="Count of messages containing common profanity">
-                <div className="text-2xl font-bold">{kpis.profanity_hits}</div>
+              <Card title="Profanity /1k words" tooltip="Messages with profanity per 1,000 words compared to previous period">
+                <div className="text-2xl font-bold">{weProfMetrics.prof.toFixed(2)}</div>
+                {startDate && endDate && <div className="text-sm text-gray-300">{weProfMetrics.profDelta>=0?"+":""}{weProfMetrics.profDelta.toFixed(2)}</div>}
               </Card>
             </div>
           </section>
 
           <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             <div>
-              <Card title="Messages by sender">
+              <Card title="Messages by sender" tooltip="Total messages per participant in selected range">
                 <Chart option={messagesOption()} height={260} />
               </Card>
             </div>
             <div>
-              <Card title="Words by sender">
+              <Card title="Words by sender" tooltip="Total words per participant in selected range">
                 <Chart option={wordsOption()} height={260} />
               </Card>
             </div>
             <div className="xl:row-span-2">
-              <Card title="Timeline">
+              <Card title="Timeline" tooltip="Daily or weekly counts of messages or words">
                 <div className="flex gap-2 mb-2 items-center">
                   <button onClick={()=>setTimelineMetric("messages")} className={`px-3 py-1 rounded-full ${timelineMetric==="messages"?"bg-white/20":"bg-white/10"}`}>Messages</button>
                   <button onClick={()=>setTimelineMetric("words")} className={`px-3 py-1 rounded-full ${timelineMetric==="words"?"bg-white/20":"bg-white/10"}`}>Words</button>
@@ -499,12 +532,12 @@ async function fetchConflicts() {
               </Card>
             </div>
             <div>
-              <Card title="Words per message">
+              <Card title="Words per message" tooltip="Messages vs words; bubble size shows words per message">
                 <Chart option={wordsPerMessageOption()} height={260} />
               </Card>
             </div>
             <div>
-              <Card title="Seconds to reply">
+              <Card title="Seconds to reply" tooltip="Average time from one person's message to another's reply">
                 <Chart option={replyOption()} height={260} />
                 {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
               </Card>
@@ -513,16 +546,16 @@ async function fetchConflicts() {
 
           <section id="conflicts" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card title="Conflicts per month">
+              <Card title="Conflicts per month" tooltip="Number of detected conflict segments each month">
                 {conflictProgress && (
                   <div className="text-sm text-gray-400 mb-2">
-                    Analyzing {conflictProgress.current}/{conflictProgress.total} segments...
+                    Analyzing {formatNumber(conflictProgress.current)}/{formatNumber(conflictProgress.total)} segments...
                   </div>
                 )}
                 <Chart option={conflictBarOption()} height={260} onEvents={{ click: onConflictBarClick }} />
                 {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
               </Card>
-              <Card title={selectedConflict ? `Conflicts in ${selectedConflict.month}` : "Conflict details"}>
+              <Card title={selectedConflict ? `Conflicts in ${selectedConflict.month}` : "Conflict details"} tooltip="Summaries of conflicts for the selected month">
                 {selectedConflict ? (
                   <ul className="text-sm text-gray-300 list-disc ml-5">
                     {selectedConflict.conflicts.map((c:any,i:number)=>(
@@ -536,14 +569,14 @@ async function fetchConflicts() {
                 )}
               </Card>
             </div>
-            <Card title="Conflict timeline">
+            <Card title="Conflict timeline" tooltip="Chronological scatter of detected conflicts">
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
             </Card>
           </section>
 
           <section id="heatmap" className="grid grid-cols-1 gap-6">
-            <Card title="Daily rhythm heatmap (weekday × hour)">
+            <Card title="Daily rhythm heatmap (weekday × hour)" tooltip="Message volume by weekday and hour">
               <div className="flex gap-2 mb-2">
                 <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
                 {participants.map(p => (
@@ -555,7 +588,7 @@ async function fetchConflicts() {
           </section>
 
           <section id="wordcloud" className="grid grid-cols-1 gap-6">
-            <Card title="Word cloud by participant">
+            <Card title="Word cloud by participant" tooltip="Most frequent words or emojis for each participant">
               <div className="mb-2 flex flex-wrap gap-3">
                 {wordCategories.map(cat => (
                   <label key={cat} className="text-xs flex items-center gap-1">
@@ -594,8 +627,8 @@ async function fetchConflicts() {
               title="Questions (total & per person)"
               tooltip="Questions are messages that end with a '?' or start with words like 'who' or 'why'. Marked as unanswered if no one else replies within 15 minutes."
             >
-              <div className="text-3xl">{kpis.questions.total}</div>
-              <div className="text-sm text-gray-300">Unanswered within 15m: {kpis.questions.unanswered_15m}</div>
+              <div className="text-3xl">{formatNumber(kpis.questions.total)}</div>
+              <div className="text-sm text-gray-300">Unanswered within 15m: {formatNumber(kpis.questions.unanswered_15m)}</div>
               {cardSplit("questions")}
               <div className="mt-1 text-sm text-gray-300">Unanswered per person:</div>
               {cardSplit("unanswered")}
@@ -604,14 +637,14 @@ async function fetchConflicts() {
               title="Attachments (total & per person)"
               tooltip="Counts messages that include media or file attachments such as photos, videos, audio, or documents."
             >
-              <div className="text-3xl">{kpis.media_total}</div>
+              <div className="text-3xl">{formatNumber(kpis.media_total)}</div>
               {cardSplit("attachments")}
             </Card>
             <Card
               title="Affection markers (total & per person)"
               tooltip="Messages containing affectionate words or emojis like 'love you', '😘', or '❤️'."
             >
-              <div className="text-3xl">{kpis.affection_hits}</div>
+              <div className="text-3xl">{formatNumber(kpis.affection_hits)}</div>
               {cardSplit("affection")}
             </Card>
           </section>

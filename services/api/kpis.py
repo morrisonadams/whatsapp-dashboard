@@ -29,6 +29,15 @@ QUESTION_PAT = re.compile(r"\?\s*$|^\s*(?:who|what|when|where|why|how|can|do|did
 STOPWORDS = set(WC_STOPWORDS)
 STOPWORDS.update({"im", "us", "our", "ours", "your"})
 
+
+def _count_tokens(text: str, toks: List[str]) -> int:
+    """Count occurrences of specific tokens in a piece of text."""
+    if not text:
+        return 0
+    txt = re.sub(r"[^a-zA-Z\s]", " ", text.lower())
+    words = txt.split()
+    return sum(1 for w in words if w in toks)
+
 def word_counts(df: pd.DataFrame, participants: List[str], top_n: int = 50) -> Dict[str, List[Dict[str, Any]]]:
     out: Dict[str, List[Dict[str, Any]]] = {}
     filtered = df[
@@ -161,13 +170,8 @@ def heatmap_hour_weekday(df: pd.DataFrame) -> pd.DataFrame:
     return d.groupby(["weekday","hour","sender"]).size().reset_index(name="count")
 
 def we_ness(df: pd.DataFrame) -> float:
-    def count_tokens(text, toks):
-        if not text: return 0
-        txt = re.sub(r"[^a-zA-Z\s]", " ", text.lower())
-        words = txt.split()
-        return sum(1 for w in words if w in toks)
-    we = int(df["text"].fillna("").apply(lambda t: count_tokens(t, PRONOUNS_WE)).sum())
-    i_tokens = int(df["text"].fillna("").apply(lambda t: count_tokens(t, PRONOUNS_I)).sum())
+    we = int(df["text"].fillna("").apply(lambda t: _count_tokens(t, PRONOUNS_WE)).sum())
+    i_tokens = int(df["text"].fillna("").apply(lambda t: _count_tokens(t, PRONOUNS_I)).sum())
     return float(we / max(1, we + i_tokens))
 
 def affection_hits(df: pd.DataFrame) -> int:
@@ -180,6 +184,29 @@ def profanity_hits(df: pd.DataFrame) -> int:
     if len(PROFANITY)==0: return 0
     pat = re.compile("|".join(re.escape(w) for w in PROFANITY), re.IGNORECASE)
     return int(df["text"].str.contains(pat, na=False).sum())
+
+
+def daily_we_counts(df: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate counts of 'we/us/our/ours' tokens per day."""
+    if len(df) == 0:
+        return pd.DataFrame(columns=["day", "we"])
+    d = df.copy()
+    d["day"] = d["ts"].dt.strftime("%Y-%m-%d")
+    d["we"] = d["text"].fillna("").apply(lambda t: _count_tokens(t, PRONOUNS_WE))
+    return d.groupby("day")["we"].sum().astype(int).reset_index()
+
+
+def daily_profanity_counts(df: pd.DataFrame) -> pd.DataFrame:
+    """Count messages containing profanity per day."""
+    if len(df) == 0:
+        return pd.DataFrame(columns=["day", "profanity"])
+    if len(PROFANITY) == 0:
+        return pd.DataFrame(columns=["day", "profanity"])
+    pat = re.compile("|".join(re.escape(w) for w in PROFANITY), re.IGNORECASE)
+    d = df.copy()
+    d["day"] = d["ts"].dt.strftime("%Y-%m-%d")
+    d["profanity"] = d["text"].str.contains(pat, na=False)
+    return d.groupby("day")["profanity"].sum().astype(int).reset_index()
 
 def compute(df: pd.DataFrame) -> Dict[str, Any]:
     d = df[~df["is_system"]].copy().reset_index(drop=True)
@@ -250,14 +277,18 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
     aff_total = int(sum(r["affection"] for r in aff_split))
 
     # Timeline strings
-    if len(d)>0:
+    if len(d) > 0:
         day = d.copy()
         day["day"] = day["ts"].dt.strftime("%Y-%m-%d")
-        timeline_messages_df = day.groupby(["day","sender"]).size().reset_index(name="messages")
-        timeline_words_df = day.groupby(["day","sender"])["n_words"].sum().reset_index(name="words")
+        timeline_messages_df = day.groupby(["day", "sender"]).size().reset_index(name="messages")
+        timeline_words_df = day.groupby(["day", "sender"])["n_words"].sum().reset_index(name="words")
+        we_daily_df = daily_we_counts(day)
+        prof_daily_df = daily_profanity_counts(day)
     else:
-        timeline_messages_df = pd.DataFrame(columns=["day","sender","messages"])
-        timeline_words_df = pd.DataFrame(columns=["day","sender","words"])
+        timeline_messages_df = pd.DataFrame(columns=["day", "sender", "messages"])
+        timeline_words_df = pd.DataFrame(columns=["day", "sender", "words"])
+        we_daily_df = pd.DataFrame(columns=["day", "we"])
+        prof_daily_df = pd.DataFrame(columns=["day", "profanity"])
 
     # Heatmap
     heat_df = heatmap_hour_weekday(d) if len(d)>0 else pd.DataFrame(columns=["weekday","hour","sender","count"])
@@ -279,6 +310,8 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "affection_split": aff_split,
         "timeline_messages": timeline_messages_df.to_dict(orient="records"),
         "timeline_words": timeline_words_df.to_dict(orient="records"),
+        "timeline_we": we_daily_df.to_dict(orient="records"),
+        "timeline_profanity": prof_daily_df.to_dict(orient="records"),
         "heatmap": heat_df.to_dict(orient="records"),
         "word_cloud": word_cloud
     }
