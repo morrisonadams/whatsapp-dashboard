@@ -6,6 +6,10 @@ import Chart from "@/components/Chart";
 import KpiStrip from "@/components/KpiStrip";
 import useThemePalette from "@/lib/useThemePalette";
 import UnifiedTimeline from "@/components/UnifiedTimeline";
+import SenderShareAreaChart from "@/components/SenderShareAreaChart";
+import WordsPerMessageBoxplot from "@/components/WordsPerMessageBoxplot";
+import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
+import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
 
 type KPI = any;
 const formatNumber = (n: number) => n.toLocaleString();
@@ -19,7 +23,6 @@ export default function Home() {
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
-  const [heatPerson, setHeatPerson] = useState<string>("All");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
   const palette = useThemePalette();
@@ -99,63 +102,6 @@ async function fetchConflicts() {
     return participants.map(p => ({ sender: p, messages: msgMap[p]||0, words: wordMap[p]||0 }));
   }, [kpis, startDate, endDate, participants]);
 
-  const messagesOption = () => {
-    const rows = filteredBySender;
-    return {
-      backgroundColor: "transparent",
-      textStyle: { color: palette.text },
-      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
-      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
-      series: [
-        {
-          type: "bar",
-          data: rows.map((r:any)=>({ value: r.messages, itemStyle: { color: colorMap[r.sender] } })),
-          barWidth: "40%"
-        }
-      ]
-    };
-  };
-
-  const wordsOption = () => {
-    const rows = filteredBySender;
-    return {
-      backgroundColor: "transparent",
-      textStyle: { color: palette.text },
-      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: rows.map((r:any)=>r.sender), axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text} },
-      yAxis: { type: "value", axisLine:{lineStyle:{color: palette.subtext}}, axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)} },
-      series: [
-        {
-          type: "bar",
-          data: rows.map((r:any)=>({ value: r.words, itemStyle: { color: colorMap[r.sender] } })),
-          barWidth: "40%"
-        }
-      ]
-    };
-  };
-
-  const replyOption = () => {
-    const rs = (kpis?.reply_simple || []) as Array<any>;
-    return {
-      backgroundColor: "transparent",
-      textStyle: { color: palette.text },
-      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: participants, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "value", name: "seconds", axisLabel:{color: palette.text, formatter: (value:number) => formatNumber(value)}, axisLine:{lineStyle:{color: palette.subtext}} },
-      series: [
-        {
-          type: "bar",
-          data: participants.map(p => {
-            const row = rs.find((r:any)=>r.person===p) || {};
-            return { value: row.seconds || 0, itemStyle: { color: colorMap[p] } };
-          }),
-          barWidth: "40%"
-        }
-      ]
-    };
-  };
-
   const messagesWordsPerDayOption = () => {
     const daySet = new Set<string>();
     (kpis?.timeline_messages || []).forEach((r:any)=>{ if(dateFilter(r.day)) daySet.add(r.day); });
@@ -199,31 +145,6 @@ async function fetchConflicts() {
           label: { show: true, formatter: (p:any) => p.data.sender, color: palette.text }
         }
       ]
-    };
-  };
-
-
-  const heatOption = () => {
-    const hm = (kpis?.heatmap || []).filter((r:any)=> heatPerson==="All" ? true : r.sender===heatPerson);
-    const hours = Array.from({length:24}).map((_,i)=>i);
-    const weekdays = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-    const mat = Array.from({length:7},()=>Array(24).fill(0));
-    hm.forEach((r:any)=>{ mat[r.weekday][r.hour] += r.count; });
-    const data:any[] = [];
-    for (let w=0; w<7; w++) for (let h=0; h<24; h++) data.push([h, w, mat[w][h]]);
-    const vmax = Math.max(1, ...data.map((d:any)=>d[2]));
-    return {
-      backgroundColor: "transparent",
-      textStyle: { color: palette.text },
-      tooltip: { valueFormatter: (value: number) => formatNumber(value) },
-      xAxis: { type: "category", data: hours, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      yAxis: { type: "category", data: weekdays, axisLabel:{color: palette.text}, axisLine:{lineStyle:{color: palette.subtext}} },
-      visualMap: { min: 0, max: vmax, calculable: true, orient:"horizontal", left:"center", textStyle:{color: palette.text}, inRange:{color:[palette.series[0], palette.series[1], palette.series[5]]} },
-      series: [{
-        type: "heatmap",
-        data,
-        label: { show: false },
-      }]
     };
   };
 
@@ -339,18 +260,14 @@ async function fetchConflicts() {
             <KpiStrip kpis={kpis} startDate={startDate} endDate={endDate} />
           </section>
 
-          <section id="analytics" className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            <div>
-              <Card title="Messages by sender">
-                <Chart option={messagesOption()} height={260} />
-              </Card>
+          <section id="analytics" className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <SenderShareAreaChart messages={kpis?.timeline_messages || []} participants={participants} />
+              <WordsPerMessageBoxplot data={kpis?.words_per_message || {}} />
+              <ReplyTimeDistribution data={kpis?.reply_times || {}} />
+              <DailyRhythmHeatmap data={kpis?.heatmap || []} participants={participants} />
             </div>
-            <div>
-              <Card title="Words by sender">
-                <Chart option={wordsOption()} height={260} />
-              </Card>
-            </div>
-            <div className="xl:row-span-2">
+            <div className="space-y-6">
               <Card title="Timeline">
                 <UnifiedTimeline
                   messages={kpis.timeline_messages || []}
@@ -360,16 +277,8 @@ async function fetchConflicts() {
                 />
                 {(!kpis || (kpis.timeline_messages || []).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
               </Card>
-            </div>
-            <div>
               <Card title="Messages vs Words per Day">
                 <Chart option={messagesWordsPerDayOption()} height={260} />
-              </Card>
-            </div>
-            <div>
-              <Card title="Seconds to reply">
-                <Chart option={replyOption()} height={260} />
-                {(!kpis?.reply_simple || kpis.reply_simple.length===0) && <div className="text-sm text-gray-400 mt-2">No alternating replies detected yet.</div>}
               </Card>
             </div>
           </section>
@@ -402,18 +311,6 @@ async function fetchConflicts() {
             <Card title="Conflict timeline">
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
-            </Card>
-          </section>
-
-          <section id="heatmap" className="grid grid-cols-1 gap-6">
-            <Card title="Daily rhythm heatmap (weekday × hour)">
-              <div className="flex gap-2 mb-2">
-                <button onClick={()=>setHeatPerson("All")} className={`px-3 py-1 rounded-full ${heatPerson==="All"?"bg-white/20":"bg-white/10"}`}>All</button>
-                {participants.map(p => (
-                  <button key={p} onClick={()=>setHeatPerson(p)} className={`px-3 py-1 rounded-full ${heatPerson===p?"bg-white/20":"bg-white/10"}`}>{p}</button>
-                ))}
-              </div>
-              <Chart option={heatOption()} height={360} />
             </Card>
           </section>
 
