@@ -202,12 +202,20 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "words": int(by_sender_df["words"].sum()) if len(by_sender_df)>0 else 0
     }
 
+    # Words per message distribution per participant
+    words_per_message = {
+        str(p): d[d["sender"] == p]["n_words"].astype(int).tolist()
+        for p in participants
+    }
+
     # Reply stats (first message in each run versus next sender)
     rp = reply_pairs(d)
     reply_simple = []
+    reply_times = {str(p): [] for p in participants}
     if not rp.empty:
         for person, arr in rp.groupby("to")["sec"]:
             arr = arr.clip(lower=0)
+            reply_times[str(person)] = arr.astype(float).tolist()
             reply_simple.append({
                 "person": str(person),
                 "seconds": float(arr.mean()),
@@ -288,6 +296,8 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "by_sender": by_sender_df.to_dict(orient="records"),
         "totals": totals,
         "reply_simple": reply_simple,
+        "words_per_message": words_per_message,
+        "reply_times": reply_times,
         "interruptions": interrupts.to_dict(orient="records"),
         "questions": {"total": questions_total, "unanswered_15m": unanswered_total},
         "questions_split": q_split,
