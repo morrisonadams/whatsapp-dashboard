@@ -236,18 +236,23 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
     q_split = [{"sender": p, "questions": int(q_counts.get(p,0)), "unanswered_15m": int(un_counts.get(p,0))} for p in participants]
 
     # Profanity + we-ness + affection
-    prof_total = profanity_hits(d)
+    if PROFANITY:
+        prof_pat = re.compile("|".join(re.escape(w) for w in PROFANITY), re.IGNORECASE)
+        d["is_profanity"] = d["text"].str.contains(prof_pat, na=False)
+    else:
+        d["is_profanity"] = False
+    prof_total = int(d["is_profanity"].sum())
+
+    if AFFECTION_TOKENS:
+        aff_pat = re.compile("|".join(re.escape(tok) for tok in AFFECTION_TOKENS), re.IGNORECASE)
+        d["is_affection"] = d["text"].str.contains(aff_pat, na=False)
+    else:
+        d["is_affection"] = False
+    aff_counts = d.groupby("sender")["is_affection"].sum().astype(int) if len(d)>0 else pd.Series(dtype=int)
+    aff_split = [{"sender": p, "affection": int(aff_counts.get(p,0))} for p in participants]
+    aff_total = int(aff_counts.sum())
+
     we_ratio = we_ness(d)
-    aff_split = []
-    for p, sub in d.groupby("sender"):
-        cnt = 0
-        for tok in AFFECTION_TOKENS:
-            cnt += int(sub["text"].str.contains(re.escape(tok), case=False, na=False).sum())
-        aff_split.append({"sender": p, "affection": int(cnt)})
-    for p in participants:
-        if not any(r["sender"]==p for r in aff_split):
-            aff_split.append({"sender": p, "affection": 0})
-    aff_total = int(sum(r["affection"] for r in aff_split))
 
     # Timeline strings
     if len(d)>0:
@@ -255,9 +260,17 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         day["day"] = day["ts"].dt.strftime("%Y-%m-%d")
         timeline_messages_df = day.groupby(["day","sender"]).size().reset_index(name="messages")
         timeline_words_df = day.groupby(["day","sender"])["n_words"].sum().reset_index(name="words")
+        timeline_questions_df = day.groupby(["day","sender"])["is_question"].sum().reset_index(name="questions")
+        timeline_media_df = day.groupby(["day","sender"])["has_media"].sum().reset_index(name="media")
+        timeline_affection_df = day.groupby(["day","sender"])["is_affection"].sum().reset_index(name="affection")
+        timeline_profanity_df = day.groupby(["day","sender"])["is_profanity"].sum().reset_index(name="profanity")
     else:
         timeline_messages_df = pd.DataFrame(columns=["day","sender","messages"])
         timeline_words_df = pd.DataFrame(columns=["day","sender","words"])
+        timeline_questions_df = pd.DataFrame(columns=["day","sender","questions"])
+        timeline_media_df = pd.DataFrame(columns=["day","sender","media"])
+        timeline_affection_df = pd.DataFrame(columns=["day","sender","affection"])
+        timeline_profanity_df = pd.DataFrame(columns=["day","sender","profanity"])
 
     # Heatmap
     heat_df = heatmap_hour_weekday(d) if len(d)>0 else pd.DataFrame(columns=["weekday","hour","sender","count"])
@@ -279,6 +292,10 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "affection_split": aff_split,
         "timeline_messages": timeline_messages_df.to_dict(orient="records"),
         "timeline_words": timeline_words_df.to_dict(orient="records"),
+        "timeline_questions": timeline_questions_df.to_dict(orient="records"),
+        "timeline_media": timeline_media_df.to_dict(orient="records"),
+        "timeline_affection": timeline_affection_df.to_dict(orient="records"),
+        "timeline_profanity": timeline_profanity_df.to_dict(orient="records"),
         "heatmap": heat_df.to_dict(orient="records"),
         "word_cloud": word_cloud
     }
