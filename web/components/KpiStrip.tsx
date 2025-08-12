@@ -106,6 +106,15 @@ export default function KpiStrip({ kpis, startDate, endDate }: Props) {
 
   const weRatio = kpis.we_ness_ratio || 0;
   const wePrev = kpis.prev_we_ness_ratio;
+  const weAgg = aggregate(kpis.timeline_we_ness || [], "we", startDate, endDate);
+  const iAgg = aggregate(kpis.timeline_we_ness || [], "i", startDate, endDate);
+  const weTrend = wordAgg.days.map((d) => {
+    const wIdx = weAgg.days.indexOf(d);
+    const weCount = wIdx >= 0 ? weAgg.values[wIdx] : 0;
+    const iIdx = iAgg.days.indexOf(d);
+    const iCount = iIdx >= 0 ? iAgg.values[iIdx] : 0;
+    return weCount / Math.max(1, weCount + iCount);
+  });
 
   const metrics = [
     {
@@ -125,7 +134,7 @@ export default function KpiStrip({ kpis, startDate, endDate }: Props) {
     {
       title: "We-ness ratio",
       value: weRatio,
-      trend: wordAgg.values.map(() => weRatio),
+      trend: weTrend,
       delta: wePrev !== undefined ? delta(weRatio, wePrev) : undefined,
       tooltip: "Share of 'we/us/our' vs 'I/me/my'",
     },
