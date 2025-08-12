@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import Chart from "@/components/Chart";
 import useThemePalette from "@/lib/useThemePalette";
 
@@ -13,6 +13,13 @@ interface Props {
 
 export default function UnifiedTimeline({ messages, startDate, endDate, onRangeChange }: Props) {
   const palette = useThemePalette();
+  const zoomTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (zoomTimeout.current) clearTimeout(zoomTimeout.current);
+    };
+  }, []);
 
   const days = useMemo(() => {
     return Array.from(new Set(messages.map(r => r.day))).sort();
@@ -83,7 +90,8 @@ export default function UnifiedTimeline({ messages, startDate, endDate, onRangeC
     const eIdx = Math.round((dz.end / 100) * len);
     const s = days[Math.min(len, Math.max(0, sIdx))];
     const eVal = days[Math.min(len, Math.max(0, eIdx))];
-    onRangeChange(s, eVal);
+    if (zoomTimeout.current) clearTimeout(zoomTimeout.current);
+    zoomTimeout.current = setTimeout(() => onRangeChange(s, eVal), 150);
   };
 
   return <Chart option={option} height={300} onEvents={{ datazoom: handleZoom }} />;
