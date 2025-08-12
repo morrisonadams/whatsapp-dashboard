@@ -98,7 +98,15 @@ def _pair_replies(df: pd.DataFrame) -> pd.DataFrame:
 def compute(df: pd.DataFrame) -> Dict[str, Any]:
     global _last_kpis
     if df is None or df.empty:
-        _last_kpis = {"participants": [], "by_sender": [], "timeline_messages": [], "timeline_words": [], "reply_simple": []}
+        _last_kpis = {
+            "participants": [],
+            "by_sender": [],
+            "timeline_messages": [],
+            "timeline_words": [],
+            "reply_simple": [],
+            "words_per_message": {},
+            "reply_times": {},
+        }
         return _last_kpis
 
     parts = _participants(df)
@@ -129,11 +137,20 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         .to_dict(orient="records")
     )
 
+    # Words per message distribution per participant
+    words_per_message = {
+        p: df[(df["sender"] == p) & (~df["is_system"])]
+        ["n_words"].astype(int).tolist()
+        for p in parts
+    }
+
     pairs = _pair_replies(df)
     reply_simple = []
+    reply_times: Dict[str, List[float]] = {}
     for p in parts:
         v = pairs[pairs["to"] == p]["dt_sec"]
-        reply_simple.append({"person": p, "seconds": float(v.mean()) if len(v)>0 else 0.0})
+        reply_simple.append({"person": p, "seconds": float(v.mean()) if len(v) > 0 else 0.0})
+        reply_times[p] = v.astype(float).tolist()
 
     q = df[~df["is_system"] & df["text"].str.contains(r"\?\s*$", regex=True)]
     unanswered_total = 0
@@ -171,6 +188,8 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "timeline_words": timeline_words,
         "heatmap": heat,
         "reply_simple": reply_simple,
+        "words_per_message": words_per_message,
+        "reply_times": reply_times,
         "questions": {
             "total": questions_total,
             "unanswered_15m": unanswered_total,
