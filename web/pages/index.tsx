@@ -99,15 +99,6 @@ async function fetchConflicts() {
     return participants.map(p => ({ sender: p, messages: msgMap[p]||0, words: wordMap[p]||0 }));
   }, [kpis, startDate, endDate, participants]);
 
-  const conflictMarkers = useMemo(
-    () => conflicts.flatMap(p => (p.conflicts || []).map((c:any) => ({ date: c.date, summary: c.summary }))),
-    [conflicts]
-  );
-  const affectionMarkers = useMemo(
-    () => (kpis?.timeline_affection || []) as Array<{day:string; affection:number}>,
-    [kpis]
-  );
-
   const messagesOption = () => {
     const rows = filteredBySender;
     return {
@@ -363,9 +354,6 @@ async function fetchConflicts() {
               <Card title="Timeline">
                 <UnifiedTimeline
                   messages={kpis.timeline_messages || []}
-                  words={kpis.timeline_words || []}
-                  conflicts={conflictMarkers}
-                  affection={affectionMarkers}
                   startDate={startDate}
                   endDate={endDate}
                   onRangeChange={(s, e) => { setStartDate(s); setEndDate(e); }}
