@@ -164,13 +164,13 @@ async function fetchConflicts() {
       sender: r.sender,
       messagesPerDay: r.messages / days,
       wordsPerDay: r.words / days,
-      mpw: r.words ? r.messages / r.words : 0
+      wpm: r.messages ? r.words / r.messages : 0
     }));
     return {
       backgroundColor: "transparent",
       textStyle: { color: palette.text },
       tooltip: {
-        formatter: (p: any) => `${p.data.sender}<br/>Messages/day: ${p.data.messagesPerDay.toFixed(2)}<br/>Words/day: ${p.data.wordsPerDay.toFixed(2)}<br/>Msgs/word: ${p.data.mpw.toFixed(2)}`
+        formatter: (p: any) => `${p.data.sender}<br/>Messages/day: ${p.data.messagesPerDay.toFixed(2)}<br/>Words/day: ${p.data.wordsPerDay.toFixed(2)}<br/>Words/msg: ${p.data.wpm.toFixed(2)}`
       },
       xAxis: {
         type: "value",
@@ -192,8 +192,8 @@ async function fetchConflicts() {
             sender: r.sender,
             messagesPerDay: r.messagesPerDay,
             wordsPerDay: r.wordsPerDay,
-            mpw: r.mpw,
-            symbolSize: Math.max(20, Math.min(80, r.mpw * 200)),
+            wpm: r.wpm,
+            symbolSize: Math.max(20, Math.min(80, r.wpm * 8)),
             itemStyle: { color: colorMap[r.sender] }
           })),
           label: { show: true, formatter: (p:any) => p.data.sender, color: palette.text }
