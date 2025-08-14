@@ -35,10 +35,50 @@ export default function DailyRhythmHeatmap({ data, participants }: Props) {
     backgroundColor: "transparent",
     textStyle: { color: palette.text },
     tooltip: { valueFormatter: (v: number) => v.toLocaleString() },
-    xAxis: { type: "category", data: hours, axisLabel: { color: palette.text }, axisLine: { lineStyle: { color: palette.subtext } } },
-    yAxis: { type: "category", data: weekdays, axisLabel: { color: palette.text }, axisLine: { lineStyle: { color: palette.subtext } } },
-    visualMap: { min: 0, max: vmax, calculable: true, orient: "horizontal", left: "center", textStyle: { color: palette.text }, inRange: { color: [palette.series[0], palette.series[1], palette.series[5]] } },
-    series: [{ type: "heatmap", data: chartData, label: { show: false } }]
+    xAxis: {
+      type: "category",
+      data: hours,
+      position: "top",
+      axisLabel: { color: palette.text },
+      axisLine: { lineStyle: { color: palette.subtext } }
+    },
+    yAxis: {
+      type: "category",
+      data: weekdays,
+      axisLabel: { color: palette.text },
+      axisLine: { lineStyle: { color: palette.subtext } }
+    },
+    visualMap: {
+      min: 0,
+      max: vmax,
+      orient: "horizontal",
+      left: "center",
+      textStyle: { color: palette.text },
+      inRange: { color: [palette.series[0]], colorAlpha: [0, 1] }
+    },
+    series: [
+      {
+        type: "custom",
+        silent: true,
+        data: [[5], [6]],
+        renderItem: (params: any, api: any) => {
+          const y = api.value(0);
+          const start = api.coord([0, y]);
+          const end = api.coord([24, y + 1]);
+          return {
+            type: "rect",
+            shape: {
+              x: start[0],
+              y: start[1],
+              width: end[0] - start[0],
+              height: end[1] - start[1]
+            },
+            style: { fill: palette.text, opacity: 0.05 }
+          };
+        }
+      },
+      { type: "heatmap", data: chartData, label: { show: false }, z: 1 }
+    ]
   };
 
   return (
