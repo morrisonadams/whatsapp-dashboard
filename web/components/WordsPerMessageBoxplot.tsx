@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import Chart from "@/components/Chart";
 import Card from "@/components/Card";
 import useThemePalette from "@/lib/useThemePalette";
+import { useDateRange } from "@/lib/DateRangeContext";
 
 interface Props {
   data: Record<string, number[]>; // sender -> word counts per message
@@ -22,6 +23,7 @@ function calcBox(values: number[]): [number, number, number, number, number] {
 
 export default function WordsPerMessageBoxplot({ data }: Props) {
   const palette = useThemePalette();
+  const _range = useDateRange();
   const participants = useMemo(() => Object.keys(data), [data]);
 
   const colorMap = useMemo(() => {

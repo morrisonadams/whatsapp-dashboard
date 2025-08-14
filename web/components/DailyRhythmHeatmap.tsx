@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import Chart from "@/components/Chart";
 import Card from "@/components/Card";
 import useThemePalette from "@/lib/useThemePalette";
+import { useDateRange } from "@/lib/DateRangeContext";
 
 interface HeatPoint {
   weekday: number; // 0=Mon
@@ -17,6 +18,7 @@ interface Props {
 
 export default function DailyRhythmHeatmap({ data, participants }: Props) {
   const palette = useThemePalette();
+  const _range = useDateRange();
   const [person, setPerson] = useState<string>("All");
 
   const filtered = useMemo(() => {

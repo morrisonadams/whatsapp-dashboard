@@ -1,9 +1,8 @@
 import KpiCard from "@/components/KpiCard";
+import { useDateRange } from "@/lib/DateRangeContext";
 
 interface Props {
   kpis: any;
-  startDate?: string;
-  endDate?: string;
 }
 
 function dateFilter(day: string, start?: string, end?: string) {
@@ -36,7 +35,8 @@ function prevSum(tl: any[], key: string, firstDay: string, len: number) {
   return Object.values(map).reduce((a, b) => a + b, 0);
 }
 
-export default function KpiStrip({ kpis, startDate, endDate }: Props) {
+export default function KpiStrip({ kpis }: Props) {
+  const { start: startDate, end: endDate } = useDateRange();
   const msgAgg = aggregate(kpis.timeline_messages || [], "messages", startDate, endDate);
   const wordAgg = aggregate(kpis.timeline_words || [], "words", startDate, endDate);
 
