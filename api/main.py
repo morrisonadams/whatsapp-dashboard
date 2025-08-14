@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Query
 import datetime as dt
 from zoneinfo import ZoneInfo
 from typing import Optional, List
+import os
 
 from services.api import parse
 from services.api.daily_themes import analyze_range
@@ -66,6 +67,14 @@ async def daily_themes(
     msgs = parse.parse_export(text, tz)
 
     daily = parse.group_by_day(msgs, tz)
+
+    if not os.getenv("OPENAI_API_KEY"):
+        return {
+            "range_start": None,
+            "range_end": None,
+            "timezone": str(tz),
+            "days": [],
+        }
 
     # Apply optional date filters
     if start:
