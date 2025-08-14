@@ -82,6 +82,9 @@ async def get_daily_themes():
     """Return daily conversation themes for the uploaded chat."""
     if STATE["messages"] is None:
         raise HTTPException(status_code=404, detail="No upload yet")
+    # Gracefully handle missing model credentials by returning an empty result
+    if not os.getenv("OPENAI_API_KEY"):
+        return {"range_start": None, "range_end": None, "timezone": "UTC", "days": []}
     try:
         daily = group_by_day(STATE["messages"], dt.timezone.utc)
         all_days: List[Dict[str, Any]] = []
