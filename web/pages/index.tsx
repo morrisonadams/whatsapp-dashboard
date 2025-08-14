@@ -238,7 +238,10 @@ async function fetchConflicts() {
   return (
     <DateRangeContext.Provider value={{ start: startDate, end: endDate, setRange: updateRange }}>
     <>
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-4">
+        <a href="/themes" className="text-sm text-sub underline">
+          Daily themes
+        </a>
         <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
           {busy ? "Uploading..." : "Upload chat"}
           <input type="file" className="hidden" accept=".txt" onChange={(e)=>e.target.files&&onUpload(e.target.files[0])} />
