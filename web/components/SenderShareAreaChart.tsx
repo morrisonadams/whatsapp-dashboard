@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import Chart from "@/components/Chart";
 import Card from "@/components/Card";
 import useThemePalette from "@/lib/useThemePalette";
+import { useDateRange } from "@/lib/DateRangeContext";
 
 interface MessagePoint {
   day: string;
@@ -24,6 +25,11 @@ function weekKey(day: string): string {
 
 export default function SenderShareAreaChart({ messages, participants }: Props) {
   const palette = useThemePalette();
+  const { start, end } = useDateRange();
+
+  const filtered = useMemo(() => {
+    return messages.filter(m => (!start || m.day >= start) && (!end || m.day <= end));
+  }, [messages, start, end]);
 
   const colorMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -35,19 +41,19 @@ export default function SenderShareAreaChart({ messages, participants }: Props) 
 
   const weeks = useMemo(() => {
     const weekSet = new Set<string>();
-    messages.forEach(m => weekSet.add(weekKey(m.day)));
+    filtered.forEach(m => weekSet.add(weekKey(m.day)));
     return Array.from(weekSet).sort();
-  }, [messages]);
+  }, [filtered]);
 
   const dataMap = useMemo(() => {
     const map: Record<string, Record<string, number>> = {};
-    messages.forEach(m => {
+    filtered.forEach(m => {
       const w = weekKey(m.day);
       if (!map[w]) map[w] = {};
       map[w][m.sender] = (map[w][m.sender] || 0) + m.messages;
     });
     return map;
-  }, [messages]);
+  }, [filtered]);
 
   const series = participants.map((p, i) => ({
     name: p,

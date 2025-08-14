@@ -10,6 +10,7 @@ import SenderShareAreaChart from "@/components/SenderShareAreaChart";
 import WordsPerMessageBoxplot from "@/components/WordsPerMessageBoxplot";
 import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
 import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
+import { DateRangeContext } from "@/lib/DateRangeContext";
 
 type KPI = any;
 const formatNumber = (n: number) => n.toLocaleString();
@@ -23,8 +24,10 @@ export default function Home() {
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
+  const startDate = dateRange.start;
+  const endDate = dateRange.end;
+  const updateRange = (start: string, end: string) => setDateRange({ start, end });
   const palette = useThemePalette();
 
   useEffect(() => {
@@ -37,8 +40,7 @@ export default function Home() {
     if (!kpis) return;
     const days = (kpis.timeline_messages || []).map((r:any)=>r.day).sort();
     if (days.length) {
-      setStartDate(days[0]);
-      setEndDate(days[days.length - 1]);
+      updateRange(days[0], days[days.length - 1]);
     }
   }, [kpis]);
 
@@ -234,6 +236,7 @@ async function fetchConflicts() {
   };
 
   return (
+    <DateRangeContext.Provider value={{ start: startDate, end: endDate, setRange: updateRange }}>
     <>
       <div className="flex items-center justify-end">
         <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
@@ -250,14 +253,14 @@ async function fetchConflicts() {
             <div className="flex flex-col md:flex-row gap-2 md:items-end">
               <div>
                 <label className="text-sm mr-2">Start</label>
-                <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
+                <input type="date" value={startDate} onChange={e=>updateRange(e.target.value, endDate)} className="bg-white/10 rounded px-2 py-1" />
               </div>
               <div>
                 <label className="text-sm mr-2">End</label>
-                <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)} className="bg-white/10 rounded px-2 py-1" />
+                <input type="date" value={endDate} onChange={e=>updateRange(startDate, e.target.value)} className="bg-white/10 rounded px-2 py-1" />
               </div>
             </div>
-            <KpiStrip kpis={kpis} startDate={startDate} endDate={endDate} />
+            <KpiStrip kpis={kpis} />
           </section>
 
           <section id="analytics" className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -271,9 +274,6 @@ async function fetchConflicts() {
               <Card title="Timeline">
                 <UnifiedTimeline
                   messages={kpis.timeline_messages || []}
-                  startDate={startDate}
-                  endDate={endDate}
-                  onRangeChange={(s, e) => { setStartDate(s); setEndDate(e); }}
                 />
                 {(!kpis || (kpis.timeline_messages || []).length===0) && <div className="text-sm text-gray-400 mt-2">No timeline data yet.</div>}
               </Card>
@@ -379,5 +379,6 @@ async function fetchConflicts() {
         )}
         <div className="text-xs text-gray-400">v0.2.9 — visual refinements • API v{apiVersion}</div>
     </>
+    </DateRangeContext.Provider>
   );
 }

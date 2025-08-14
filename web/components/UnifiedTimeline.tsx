@@ -1,18 +1,17 @@
 import { useMemo, useRef, useEffect } from "react";
 import Chart from "@/components/Chart";
 import useThemePalette from "@/lib/useThemePalette";
+import { useDateRange } from "@/lib/DateRangeContext";
 
 interface MessagePoint { day: string; sender: string; messages: number; }
 
 interface Props {
   messages: MessagePoint[];
-  startDate?: string;
-  endDate?: string;
-  onRangeChange?: (start: string, end: string) => void;
 }
 
-export default function UnifiedTimeline({ messages, startDate, endDate, onRangeChange }: Props) {
+export default function UnifiedTimeline({ messages }: Props) {
   const palette = useThemePalette();
+  const { start: startDate, end: endDate, setRange } = useDateRange();
   const zoomTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -83,7 +82,6 @@ export default function UnifiedTimeline({ messages, startDate, endDate, onRangeC
   };
 
   const handleZoom = (e: any) => {
-    if (!onRangeChange) return;
     const dz = Array.isArray(e.batch) && e.batch.length ? e.batch[0] : e;
     if (dz.start == null || dz.end == null) return;
     const sIdx = Math.round((dz.start / 100) * len);
@@ -91,7 +89,7 @@ export default function UnifiedTimeline({ messages, startDate, endDate, onRangeC
     const s = days[Math.min(len, Math.max(0, sIdx))];
     const eVal = days[Math.min(len, Math.max(0, eIdx))];
     if (zoomTimeout.current) clearTimeout(zoomTimeout.current);
-    zoomTimeout.current = setTimeout(() => onRangeChange(s, eVal), 150);
+    zoomTimeout.current = setTimeout(() => setRange(s, eVal), 150);
   };
 
   return <Chart option={option} height={300} onEvents={{ datazoom: handleZoom }} />;
