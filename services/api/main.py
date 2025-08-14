@@ -2,10 +2,12 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
-from parse import parse_export
+from typing import List, Dict, Any, Optional
+import datetime as dt
+from parse import parse_export, group_by_day, iterate_14day_ranges
 from kpis import to_df, compute
 from conflict import analyze_conflicts, stream_conflicts, periods_to_months
+from daily_themes import analyze_range
 import json
 import os
 from dotenv import load_dotenv
@@ -28,6 +30,7 @@ app.add_middleware(
 
 STATE = {
     "messages_df": None,
+    "messages": None,
     "kpis": None,
 }
 
@@ -56,6 +59,7 @@ async def upload(file: UploadFile = File(...)):
     df = to_df(msgs)
     k = compute(df)
     STATE["messages_df"] = df
+    STATE["messages"] = msgs
     STATE["kpis"] = k
     return {"kpis": k}
 
@@ -71,6 +75,34 @@ def get_messages():
         raise HTTPException(status_code=404, detail="No upload yet")
     df = STATE["messages_df"]
     return {"messages": df.to_dict(orient="records")}
+
+
+@app.get("/daily_themes")
+async def get_daily_themes():
+    """Return daily conversation themes for the uploaded chat."""
+    if STATE["messages"] is None:
+        raise HTTPException(status_code=404, detail="No upload yet")
+    try:
+        daily = group_by_day(STATE["messages"], dt.timezone.utc)
+        all_days: List[Dict[str, Any]] = []
+        start: Optional[dt.date] = None
+        end: Optional[dt.date] = None
+        for range_start, range_end, msgs in iterate_14day_ranges(daily):
+            res = analyze_range(range_start, range_end, msgs, dt.timezone.utc)
+            all_days.extend(res.get("days", []))
+            if start is None or range_start < start:
+                start = range_start
+            if end is None or range_end > end:
+                end = range_end
+        all_days.sort(key=lambda d: d.get("date", ""))
+        return {
+            "range_start": start.isoformat() if start else None,
+            "range_end": end.isoformat() if end else None,
+            "timezone": "UTC",
+            "days": all_days,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @app.get("/conflicts", response_model=ConflictResponse)
