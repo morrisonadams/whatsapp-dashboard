@@ -1,4 +1,10 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query
+import datetime as dt
+from zoneinfo import ZoneInfo
+from typing import Optional, List
+
+from services.api import parse
+from services.api.daily_themes import analyze_range
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any
@@ -39,3 +45,68 @@ def debug():
 @app.get("/kpis_raw")
 def kpis_raw():
     return kpi._last_kpis if kpi._last_kpis is not None else {}
+
+
+@app.post("/daily_themes")
+async def daily_themes(
+    file: UploadFile = File(...),
+    timezone: str = Query(..., alias="timezone"),
+    start: Optional[str] = Query(None),
+    end: Optional[str] = Query(None),
+):
+    """Analyze daily conversation themes in 14-day windows."""
+
+    try:
+        tz = ZoneInfo(timezone)
+    except Exception as exc:  # pragma: no cover - invalid timezone
+        raise HTTPException(status_code=400, detail="Invalid timezone") from exc
+
+    content = await file.read()
+    text = content.decode("utf-8", errors="ignore")
+    msgs = parse.parse_export(text, tz)
+
+    daily = parse.group_by_day(msgs, tz)
+
+    # Apply optional date filters
+    if start:
+        start_date = dt.date.fromisoformat(start)
+    else:
+        start_date = min(daily.keys()) if daily else None
+    if end:
+        end_date = dt.date.fromisoformat(end)
+    else:
+        end_date = max(daily.keys()) if daily else None
+
+    if start_date or end_date:
+        filtered: Dict[dt.date, List[parse.Message]] = {}
+        for day, items in daily.items():
+            if start_date and day < start_date:
+                continue
+            if end_date and day > end_date:
+                continue
+            filtered[day] = items
+        daily = filtered
+
+    if not daily:
+        raise HTTPException(status_code=400, detail="No messages in range")
+
+    all_days: List[Dict[str, Any]] = []
+    global_start: Optional[dt.date] = None
+    global_end: Optional[dt.date] = None
+
+    for range_start, range_end, msgs_range in parse.iterate_14day_ranges(daily):
+        res = analyze_range(range_start, range_end, msgs_range, tz)
+        all_days.extend(res.get("days", []))
+        if global_start is None or range_start < global_start:
+            global_start = range_start
+        if global_end is None or range_end > global_end:
+            global_end = range_end
+
+    all_days.sort(key=lambda d: d.get("date", ""))
+
+    return {
+        "range_start": global_start.isoformat() if global_start else None,
+        "range_end": global_end.isoformat() if global_end else None,
+        "timezone": str(tz),
+        "days": all_days,
+    }
