@@ -8,7 +8,7 @@ import datetime as dt
 from parse import parse_export, group_by_day, iterate_14day_ranges
 from kpis import to_df, compute
 from conflict import analyze_conflicts, stream_conflicts, periods_to_months
-from daily_themes import analyze_range
+from daily_themes import analyze_ranges, stream_daily_themes
 import json
 import os
 from dotenv import load_dotenv
@@ -94,19 +94,28 @@ async def get_daily_themes():
         }
     try:
         daily = group_by_day(STATE["messages"], dt.timezone.utc)
+        ranges = list(iterate_14day_ranges(daily))
+        results = await analyze_ranges(
+            ranges, dt.timezone.utc, max_concurrency=MAX_CONCURRENCY
+        )
         all_days: List[Dict[str, Any]] = []
         start: Optional[dt.date] = None
         end: Optional[dt.date] = None
         error: Optional[str] = None
-        for range_start, range_end, msgs in iterate_14day_ranges(daily):
-            res = analyze_range(range_start, range_end, msgs, dt.timezone.utc)
+        for res in results:
             if not error and res.get("error"):
                 error = res["error"]
             all_days.extend(res.get("days", []))
-            if start is None or range_start < start:
-                start = range_start
-            if end is None or range_end > end:
-                end = range_end
+            rs = res.get("range_start")
+            re = res.get("range_end")
+            if rs:
+                rs_date = dt.date.fromisoformat(rs)
+                if start is None or rs_date < start:
+                    start = rs_date
+            if re:
+                re_date = dt.date.fromisoformat(re)
+                if end is None or re_date > end:
+                    end = re_date
         all_days.sort(key=lambda d: d.get("date", ""))
         return {
             "range_start": start.isoformat() if start else None,
@@ -139,15 +148,14 @@ async def daily_themes_stream():
     async def event_gen():
         # Emit initial progress so clients immediately see work starting
         yield f"data: {json.dumps({'current': 0, 'total': total})}\n\n"
-        for idx, (range_start, range_end, msgs) in enumerate(ranges, start=1):
-            res = await asyncio.to_thread(
-                analyze_range, range_start, range_end, msgs, dt.timezone.utc
-            )
+        async for current, t_total, res in stream_daily_themes(
+            ranges, dt.timezone.utc, max_concurrency=MAX_CONCURRENCY
+        ):
             if res.get("error"):
-                payload = {"current": idx, "total": total, "error": res["error"]}
+                payload = {"current": current, "total": t_total, "error": res["error"]}
                 yield f"data: {json.dumps(payload)}\n\n"
                 break
-            payload = {"current": idx, "total": total, "range": res}
+            payload = {"current": current, "total": t_total, "range": res}
             yield f"data: {json.dumps(payload)}\n\n"
         yield "data: [DONE]\n\n"
 

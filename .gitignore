@@ -26,6 +26,7 @@ coverage/
 
 # Cache files
 services/api/conflict_cache.json
+services/api/daily_themes_cache.json
 
 # OS / Editors
 .DS_Store
