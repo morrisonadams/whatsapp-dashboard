@@ -77,7 +77,8 @@ export async function getDailyThemes(
 
     const timeout = setTimeout(() => {
       es.close();
-      reject(new Error("Daily themes request timed out"));
+      console.error("Daily themes request timed out");
+w Error("Daily themes request timed out"));
     }, 30000);
 
     const clear = () => clearTimeout(timeout);
@@ -95,6 +96,7 @@ export async function getDailyThemes(
         if (msg.error) {
           clear();
           es.close();
+          console.error("Daily themes stream returned error", msg.error);
           reject(new Error(msg.error));
           return;
         }
@@ -112,7 +114,8 @@ export async function getDailyThemes(
         // ignore malformed messages
       }
     };
-    es.onerror = async () => {
+    es.onerror = async (ev) => {
+      console.error("Daily themes stream connection error", ev);
       clear();
       es.close();
       try {
@@ -121,15 +124,18 @@ export async function getDailyThemes(
           .json()
           .catch(async () => ({ detail: await res.text() }));
         if (!res.ok) {
+          console.error("Failed to fetch daily themes after stream error", data);
           reject(new Error(data.detail || "Failed to stream daily themes"));
           return;
         }
         if (data.error) {
+          console.error("Daily themes API returned error", data.error);
           reject(new Error(data.error));
           return;
         }
         resolve(data.days || []);
-      } catch {
+      } catch (err) {
+        console.error("Failed to stream daily themes", err);
         reject(new Error("Failed to stream daily themes"));
       }
     };

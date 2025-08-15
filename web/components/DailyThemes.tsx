@@ -38,6 +38,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
         setProgress(null);
       })
       .catch((err) => {
+        console.error("Failed to load daily themes", err);
         setError(err.message);
         setProgress(null);
       })
