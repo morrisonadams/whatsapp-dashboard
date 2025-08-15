@@ -256,10 +256,10 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       </div>
       <div className="grid grid-cols-7 gap-1">{cells}</div>
       <div className="mt-4">
-        <Chart option={scoreHistOption} height={200} />
+        <Chart option={scoreHistOption} height={300} />
       </div>
       <div className="mt-4">
-        <Chart option={rollingAvgOption} height={200} />
+        <Chart option={rollingAvgOption} height={300} />
       </div>
     </Card>
   );
