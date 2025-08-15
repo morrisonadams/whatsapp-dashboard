@@ -58,7 +58,9 @@ def analyze_range(
     client = OpenAI(api_key=api_key)
     try:
         resp = client.responses.create(
-            model="gpt-5-nano", input=prompt, response_format={"type": "json_object"}
+            model="gpt-5-nano",
+            input=prompt,
+            text={"format": {"type": "json_object"}},
         )
         content = (resp.output_text or "").strip()
         return parse_days_json(content, start, end, tz)
