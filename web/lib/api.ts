@@ -75,8 +75,17 @@ export async function getDailyThemes(
     const es = new EventSource(`${API_BASE}/daily_themes_stream`);
     const days: any[] = [];
 
+    const timeout = setTimeout(() => {
+      es.close();
+      console.error("Daily themes request timed out");
+      reject(new Error("Daily themes request timed out"));
+    }, 30000);
+
+    const clear = () => clearTimeout(timeout);
+
     es.onmessage = (ev) => {
       if (ev.data === "[DONE]") {
+        clear();
         es.close();
         days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
         resolve(days);
@@ -85,7 +94,9 @@ export async function getDailyThemes(
       try {
         const msg = JSON.parse(ev.data);
         if (msg.error) {
+          clear();
           es.close();
+          console.error("Daily themes stream returned error", msg.error);
           reject(new Error(msg.error));
           return;
         }
@@ -103,21 +114,28 @@ export async function getDailyThemes(
         // ignore malformed messages
       }
     };
-    es.onerror = async () => {
+    es.onerror = async (ev) => {
+      console.error("Daily themes stream connection error", ev);
+      clear();
       es.close();
       try {
         const res = await fetch(`${API_BASE}/daily_themes`);
-        const data = await res.json().catch(async () => ({ detail: await res.text() }));
+        const data = await res
+          .json()
+          .catch(async () => ({ detail: await res.text() }));
         if (!res.ok) {
+          console.error("Failed to fetch daily themes after stream error", data);
           reject(new Error(data.detail || "Failed to stream daily themes"));
           return;
         }
         if (data.error) {
+          console.error("Daily themes API returned error", data.error);
           reject(new Error(data.error));
           return;
         }
         resolve(data.days || []);
-      } catch {
+      } catch (err) {
+        console.error("Failed to stream daily themes", err);
         reject(new Error("Failed to stream daily themes"));
       }
     };
