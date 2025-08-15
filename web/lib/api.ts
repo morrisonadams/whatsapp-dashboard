@@ -63,3 +63,36 @@ export async function getConflicts(
     };
   });
 }
+
+export async function getDailyThemes(
+  onProgress?: (current: number, total: number) => void
+) {
+  return new Promise<any[]>((resolve, reject) => {
+    const es = new EventSource(`${API_BASE}/daily_themes_stream`);
+    const days: any[] = [];
+
+    es.onmessage = (ev) => {
+      if (ev.data === "[DONE]") {
+        es.close();
+        days.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        resolve(days);
+        return;
+      }
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.current && msg.total && onProgress) {
+          onProgress(msg.current, msg.total);
+        }
+        if (msg.range && Array.isArray(msg.range.days)) {
+          for (const d of msg.range.days) days.push(d);
+        }
+      } catch {
+        // ignore malformed messages
+      }
+    };
+    es.onerror = () => {
+      es.close();
+      reject(new Error("Failed to stream daily themes"));
+    };
+  });
+}
