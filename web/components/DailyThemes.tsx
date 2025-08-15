@@ -131,7 +131,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
   const rollingAvgData = useMemo(() => {
     const values: number[] = [];
     for (let i = 0; i < days.length; i++) {
-      const start = Math.max(0, i - 13);
+      const start = Math.max(0, i - 29);
       const slice = days
         .slice(start, i + 1)
         .map((d) => d.mood_pct ?? 0);
@@ -158,7 +158,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       },
       yAxis: {
         type: "value",
-        name: "14d Avg",
+        name: "30d Avg",
         max: 100,
         axisLabel: { color: palette.text },
         axisLine: { lineStyle: { color: palette.subtext } },
@@ -170,6 +170,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
           smooth: true,
           lineStyle: { color: palette.series[1] },
           itemStyle: { color: palette.series[1] },
+          areaStyle: { color: palette.series[1], opacity: 0.3 },
         },
       ],
     }),
