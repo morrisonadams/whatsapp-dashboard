@@ -10,6 +10,7 @@ import SenderShareAreaChart from "@/components/SenderShareAreaChart";
 import WordsPerMessageBoxplot from "@/components/WordsPerMessageBoxplot";
 import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
 import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
+import DailyThemes from "@/components/DailyThemes";
 import { DateRangeContext } from "@/lib/DateRangeContext";
 
 type KPI = any;
@@ -24,6 +25,7 @@ export default function Home() {
   const [conflictErr, setConflictErr] = useState<string | null>(null);
   const [conflictProgress, setConflictProgress] = useState<{current:number,total:number}|null>(null);
   const [selectedConflict, setSelectedConflict] = useState<any | null>(null);
+  const [themeRefresh, setThemeRefresh] = useState(0);
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: "", end: "" });
   const startDate = dateRange.start;
   const endDate = dateRange.end;
@@ -63,6 +65,7 @@ async function fetchConflicts() {
       const k = await uploadFile(file);
       setKpis(k);
       await fetchConflicts();
+      setThemeRefresh((v) => v + 1);
     } catch (e: any) {
       setErr(e?.message || "Upload failed");
     } finally {
@@ -239,9 +242,6 @@ async function fetchConflicts() {
     <DateRangeContext.Provider value={{ start: startDate, end: endDate, setRange: updateRange }}>
     <>
       <div className="flex items-center justify-end gap-4">
-        <a href="/themes" className="text-sm text-sub underline">
-          Daily themes
-        </a>
         <label className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 transition cursor-pointer">
           {busy ? "Uploading..." : "Upload chat"}
           <input type="file" className="hidden" accept=".txt" onChange={(e)=>e.target.files&&onUpload(e.target.files[0])} />
@@ -315,6 +315,11 @@ async function fetchConflicts() {
               <Chart option={conflictTimelineOption()} height={200} />
               {!conflictProgress && conflicts.length===0 && <div className="text-sm text-gray-400 mt-2">No conflict data yet.</div>}
             </Card>
+          </section>
+
+          <section id="daily" className="space-y-4">
+            <h2 className="text-xl font-semibold">Daily themes</h2>
+            <DailyThemes refreshKey={themeRefresh} />
           </section>
 
           <section id="wordcloud" className="grid grid-cols-1 gap-6">

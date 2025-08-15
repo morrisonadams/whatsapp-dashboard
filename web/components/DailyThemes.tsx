@@ -11,11 +11,20 @@ interface DayTheme {
   dominant_theme?: { id: number; name: string; icon: string };
 }
 
-export default function DailyThemes() {
+interface DailyThemesProps {
+  /**
+   * When this value changes the component will refetch data.
+   * Useful for triggering reloads after a new chat upload.
+   */
+  refreshKey?: string | number;
+}
+
+export default function DailyThemes({ refreshKey }: DailyThemesProps) {
   const [days, setDays] = useState<DayTheme[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setError(null);
     fetch(`${API_BASE}/daily_themes`)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load daily themes");
@@ -23,7 +32,7 @@ export default function DailyThemes() {
       })
       .then((data) => setDays(data.days || []))
       .catch((err) => setError(err.message));
-  }, []);
+  }, [refreshKey]);
 
   if (error) return <div className="text-red-400">{error}</div>;
   if (!days.length) return <div className="text-gray-300">No daily themes yet.</div>;

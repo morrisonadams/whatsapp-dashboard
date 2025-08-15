@@ -4,6 +4,7 @@ const sections = [
   { id: 'timeline', label: 'Timeline' },
   { id: 'conflicts', label: 'Conflicts' },
   { id: 'heatmap', label: 'Heatmap' },
+  { id: 'daily', label: 'Daily Themes' },
   { id: 'wordcloud', label: 'Word Cloud' },
   { id: 'extras', label: 'Extras' }
 ];
