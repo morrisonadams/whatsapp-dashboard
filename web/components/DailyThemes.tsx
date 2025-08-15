@@ -54,16 +54,6 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       .finally(() => setLoading(false));
   }, [refreshKey]);
 
-  if (error) return <div className="text-red-400">{error}</div>;
-  if (progress)
-    return (
-      <div className="text-gray-400">
-        Analyzing {progress.current}/{progress.total} segments...
-      </div>
-    );
-  if (loading) return <div className="text-gray-300">Loading daily themes...</div>;
-  if (!days.length) return <div className="text-gray-300">No daily themes yet.</div>;
-
   const monthDays = useMemo(() => {
     if (!currentMonth) return new Map<number, DayTheme>();
     const map = new Map<number, DayTheme>();
@@ -94,6 +84,16 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, []);
+
+  if (error) return <div className="text-red-400">{error}</div>;
+  if (progress)
+    return (
+      <div className="text-gray-400">
+        Analyzing {progress.current}/{progress.total} segments...
+      </div>
+    );
+  if (loading) return <div className="text-gray-300">Loading daily themes...</div>;
+  if (!days.length) return <div className="text-gray-300">No daily themes yet.</div>;
 
   const monthLabel = currentMonth?.toLocaleDateString(undefined, {
     year: "numeric",
