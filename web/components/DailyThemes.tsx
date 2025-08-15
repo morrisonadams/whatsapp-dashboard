@@ -31,6 +31,11 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
   const [currentMonth, setCurrentMonth] = useState<Date | null>(null);
   const palette = useThemePalette();
 
+  const parseDay = (dateStr: string) => {
+    const [year, month, day] = dateStr.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   useEffect(() => {
     if (!refreshKey) {
       setLoading(false);
@@ -44,7 +49,9 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       .then((d) => {
         setDays(d || []);
         if ((d || []).length) {
-          const last = new Date((d as DayTheme[])[(d as DayTheme[]).length - 1].date);
+          const last = parseDay(
+            (d as DayTheme[])[(d as DayTheme[]).length - 1].date
+          );
           setCurrentMonth(new Date(last.getFullYear(), last.getMonth(), 1));
         }
         setProgress(null);
@@ -61,7 +68,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     if (!currentMonth) return new Map<number, DayTheme>();
     const map = new Map<number, DayTheme>();
     days.forEach((d) => {
-      const dt = new Date(d.date);
+      const dt = parseDay(d.date);
       if (
         dt.getFullYear() === currentMonth.getFullYear() &&
         dt.getMonth() === currentMonth.getMonth()
