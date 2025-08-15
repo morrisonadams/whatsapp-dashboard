@@ -75,8 +75,16 @@ export async function getDailyThemes(
     const es = new EventSource(`${API_BASE}/daily_themes_stream`);
     const days: any[] = [];
 
+    const timeout = setTimeout(() => {
+      es.close();
+      reject(new Error("Daily themes request timed out"));
+    }, 30000);
+
+    const clear = () => clearTimeout(timeout);
+
     es.onmessage = (ev) => {
       if (ev.data === "[DONE]") {
+        clear();
         es.close();
         days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
         resolve(days);
@@ -85,6 +93,7 @@ export async function getDailyThemes(
       try {
         const msg = JSON.parse(ev.data);
         if (msg.error) {
+          clear();
           es.close();
           reject(new Error(msg.error));
           return;
@@ -104,10 +113,13 @@ export async function getDailyThemes(
       }
     };
     es.onerror = async () => {
+      clear();
       es.close();
       try {
         const res = await fetch(`${API_BASE}/daily_themes`);
-        const data = await res.json().catch(async () => ({ detail: await res.text() }));
+        const data = await res
+          .json()
+          .catch(async () => ({ detail: await res.text() }));
         if (!res.ok) {
           reject(new Error(data.detail || "Failed to stream daily themes"));
           return;
