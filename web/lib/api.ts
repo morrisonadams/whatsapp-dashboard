@@ -75,6 +75,7 @@ export async function getDailyThemes(
     const es = new EventSource(`${API_BASE}/daily_themes_stream`);
     const days: any[] = [];
 
+
     const startTimeout = () =>
       setTimeout(() => {
         es.close();
