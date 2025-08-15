@@ -18,12 +18,12 @@ class DailyThemesError(ValueError):
 PROMPT_TEMPLATE = (
     "You are an assistant categorizing daily conversation themes.\n"
     "Given the chat transcript between {date_range} in timezone {timezone},\n"
-    "analyze each day's messages and summarize the prevailing mood.\n"
+    "analyze each day's messages, looking for playfulness and how positively the two are interacting.\n"
+    "Estimate the vibe of their relationship on a scale of 0-100.\n"
     "Return a JSON object mapping each date (YYYY-MM-DD) to an object with:\n"
-    "  mood_pct: integer 0-100 representing overall mood, and\n"
+    "  mood_pct: integer 0-100 representing overall vibe, and\n"
     "  dominant_theme: object {{\"id\": <theme_id>}} where theme_id is one of:\n"
-    "    0 conflict, 1 repair, 2 affection, 3 humor, 4 logistics,\n"
-    "    5 support, 6 celebration, 7 planning, 8 question, 9 other.\n"
+    "    0 normal day, 1 emotional day, 2 conflict day, 3 exciting day.\n"
     "Example: {{\"2024-01-01\": {{\"mood_pct\": 75, \"dominant_theme\": {{\"id\": 2}}}}}}\n"
     "Transcript:\n{transcript}"
 )
