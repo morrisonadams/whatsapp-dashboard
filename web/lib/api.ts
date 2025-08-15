@@ -78,7 +78,7 @@ export async function getDailyThemes(
     const timeout = setTimeout(() => {
       es.close();
       console.error("Daily themes request timed out");
-      reject(new Error("Daily themes request timed out"));
+w Error("Daily themes request timed out"));
     }, 30000);
 
     const clear = () => clearTimeout(timeout);
