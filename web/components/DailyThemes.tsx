@@ -25,9 +25,13 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(
     null
   );
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
+    if (!refreshKey) {
+      setLoading(false);
+      return;
+    }
     setError(null);
     setProgress(null);
     setDays([]);
