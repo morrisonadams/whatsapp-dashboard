@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
+import asyncio
 import datetime as dt
 from parse import parse_export, group_by_day, iterate_14day_ranges
 from kpis import to_df, compute
@@ -106,6 +107,33 @@ async def get_daily_themes():
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/daily_themes_stream")
+async def daily_themes_stream():
+    """Stream daily theme analysis progress for the uploaded chat."""
+    if STATE["messages"] is None:
+        raise HTTPException(status_code=404, detail="No upload yet")
+    # If no API key, immediately finish with no data
+    if not os.getenv("OPENAI_API_KEY"):
+        async def empty_gen():
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(empty_gen(), media_type="text/event-stream")
+
+    daily = group_by_day(STATE["messages"], dt.timezone.utc)
+    ranges = list(iterate_14day_ranges(daily))
+    total = len(ranges)
+
+    async def event_gen():
+        for idx, (range_start, range_end, msgs) in enumerate(ranges, start=1):
+            res = await asyncio.to_thread(
+                analyze_range, range_start, range_end, msgs, dt.timezone.utc
+            )
+            payload = {"current": idx, "total": total, "range": res}
+            yield f"data: {json.dumps(payload)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
 
 
 @app.get("/conflicts", response_model=ConflictResponse)

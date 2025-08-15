@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import Card from "@/components/Card";
-import { API_BASE } from "@/lib/api";
+import { getDailyThemes } from "@/lib/api";
 
 interface DayTheme {
   date: string;
@@ -22,19 +22,32 @@ interface DailyThemesProps {
 export default function DailyThemes({ refreshKey }: DailyThemesProps) {
   const [days, setDays] = useState<DayTheme[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(
+    null
+  );
 
   useEffect(() => {
     setError(null);
-    fetch(`${API_BASE}/daily_themes`)
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to load daily themes");
-        return res.json();
+    setProgress(null);
+    setDays([]);
+    getDailyThemes((current, total) => setProgress({ current, total }))
+      .then((d) => {
+        setDays(d || []);
+        setProgress(null);
       })
-      .then((data) => setDays(data.days || []))
-      .catch((err) => setError(err.message));
+      .catch((err) => {
+        setError(err.message);
+        setProgress(null);
+      });
   }, [refreshKey]);
 
   if (error) return <div className="text-red-400">{error}</div>;
+  if (progress)
+    return (
+      <div className="text-gray-400">
+        Analyzing {progress.current}/{progress.total} segments...
+      </div>
+    );
   if (!days.length) return <div className="text-gray-300">No daily themes yet.</div>;
 
   return (
