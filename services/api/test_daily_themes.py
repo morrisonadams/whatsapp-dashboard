@@ -1,7 +1,7 @@
 import datetime as dt
 import pytest
 
-from daily_themes import parse_days_json, DailyThemesError
+from daily_themes import parse_days_json, DailyThemesError, analyze_range, Message
 from themes import THEMES, mood_to_color
 
 
@@ -41,3 +41,29 @@ def test_parse_days_json_unknown_theme():
     bad_theme_json = '{"2024-01-01": {"mood": 10, "dominant_theme": {"id": 99}}}'
     with pytest.raises(DailyThemesError):
         parse_days_json(bad_theme_json, dt.date(2024, 1, 1), dt.date(2024, 1, 1), dt.timezone.utc)
+
+
+def test_analyze_range_returns_empty_on_bad_json(monkeypatch):
+    """analyze_range should not raise even if the model output is invalid."""
+
+    class DummyResp:
+        output_text = "not json"
+
+    class DummyClient:
+        def __init__(self, api_key: str):
+            pass
+
+        class _Responses:
+            def create(self, **kwargs):
+                return DummyResp()
+
+        @property
+        def responses(self):
+            return self._Responses()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    monkeypatch.setattr("daily_themes.OpenAI", lambda api_key: DummyClient(api_key))
+
+    msg = Message(ts=dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc), sender="A", text="hi")
+    out = analyze_range(dt.date(2024, 1, 1), dt.date(2024, 1, 14), [msg], dt.timezone.utc)
+    assert out["days"] == []

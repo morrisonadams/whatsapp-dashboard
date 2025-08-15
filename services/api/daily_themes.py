@@ -17,10 +17,13 @@ class DailyThemesError(ValueError):
 PROMPT_TEMPLATE = (
     "You are an assistant categorizing daily conversation themes.\n"
     "Given the chat transcript between {date_range} in timezone {timezone},\n"
-    "analyze each day's messages and label the prevailing theme using the\n"
-    "following categories: conflict, repair, affection, humor, logistics,\n"
-    "support, celebration, planning, question, other.\n"
-    "Return a JSON object mapping each date to an array of detected themes.\n"
+    "analyze each day's messages and summarize the prevailing mood.\n"
+    "Return a JSON object mapping each date (YYYY-MM-DD) to an object with:\n"
+    "  mood_pct: integer 0-100 representing overall mood, and\n"
+    "  dominant_theme: object {{\"id\": <theme_id>}} where theme_id is one of:\n"
+    "    0 conflict, 1 repair, 2 affection, 3 humor, 4 logistics,\n"
+    "    5 support, 6 celebration, 7 planning, 8 question, 9 other.\n"
+    "Example: {{\"2024-01-01\": {{\"mood_pct\": 75, \"dominant_theme\": {{\"id\": 2}}}}}}\n"
     "Transcript:\n{transcript}"
 )
 
@@ -52,11 +55,22 @@ def analyze_range(
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY not set")
     client = OpenAI(api_key=api_key)
-    resp = client.responses.create(
-        model="gpt-5-nano", input=prompt, response_format={"type": "json_object"}
-    )
-    content = (resp.output_text or "").strip()
-    return parse_days_json(content, start, end, tz)
+    try:
+        resp = client.responses.create(
+            model="gpt-5-nano", input=prompt, response_format={"type": "json_object"}
+        )
+        content = (resp.output_text or "").strip()
+        return parse_days_json(content, start, end, tz)
+    except Exception:
+        # Gracefully fall back to an empty result if the model output cannot be
+        # parsed or the API request fails. This mirrors the robustness of the
+        # conflict analysis which never propagates errors to callers.
+        return {
+            "range_start": start.isoformat(),
+            "range_end": end.isoformat(),
+            "timezone": str(tz),
+            "days": [],
+        }
 
 
 def parse_days_json(content: str, start: dt.date, end: dt.date, tz: dt.tzinfo) -> Dict[str, Any]:
