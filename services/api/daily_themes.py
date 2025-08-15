@@ -115,7 +115,7 @@ def analyze_range(
     client = OpenAI(api_key=api_key)
     try:
         resp = client.responses.create(
-            model="gpt-5-nano",
+            model="gpt-5-mini",
             input=prompt,
             text={"format": {"type": "json_object"}},
         )
