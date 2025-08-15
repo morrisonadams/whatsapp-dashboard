@@ -122,7 +122,12 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
         {info && (
           <span
             className="flex-1 flex items-center justify-center text-xl"
-            title={info.description || ""}
+            title={[
+              info.description,
+              info.mood_pct !== undefined ? `Score: ${info.mood_pct}` : undefined,
+            ]
+              .filter(Boolean)
+              .join(" — ")}
           >
             {info.dominant_theme?.icon}
           </span>
