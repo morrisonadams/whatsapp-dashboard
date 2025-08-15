@@ -111,8 +111,10 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       series: [
         {
           type: "bar",
-          data: days.map((d) => d.mood_pct ?? 0),
-          itemStyle: { color: palette.series[0] },
+          data: days.map((d) => ({
+            value: d.mood_pct ?? 0,
+            itemStyle: { color: d.color_hex || palette.series[0] },
+          })),
         },
       ],
     }),
