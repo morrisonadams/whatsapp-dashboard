@@ -74,6 +74,7 @@ async def daily_themes(
             "range_end": None,
             "timezone": str(tz),
             "days": [],
+            "error": "OpenAI API key not set",
         }
 
     # Apply optional date filters

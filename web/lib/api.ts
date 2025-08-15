@@ -78,12 +78,17 @@ export async function getDailyThemes(
     es.onmessage = (ev) => {
       if (ev.data === "[DONE]") {
         es.close();
-        days.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        days.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
         resolve(days);
         return;
       }
       try {
         const msg = JSON.parse(ev.data);
+        if (msg.error) {
+          es.close();
+          reject(new Error(msg.error));
+          return;
+        }
         if (
           typeof msg.current === "number" &&
           typeof msg.total === "number" &&
@@ -98,9 +103,23 @@ export async function getDailyThemes(
         // ignore malformed messages
       }
     };
-    es.onerror = () => {
+    es.onerror = async () => {
       es.close();
-      reject(new Error("Failed to stream daily themes"));
+      try {
+        const res = await fetch(`${API_BASE}/daily_themes`);
+        const data = await res.json().catch(async () => ({ detail: await res.text() }));
+        if (!res.ok) {
+          reject(new Error(data.detail || "Failed to stream daily themes"));
+          return;
+        }
+        if (data.error) {
+          reject(new Error(data.error));
+          return;
+        }
+        resolve(data.days || []);
+      } catch {
+        reject(new Error("Failed to stream daily themes"));
+      }
     };
   });
 }

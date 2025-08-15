@@ -95,3 +95,37 @@ def test_daily_themes_stream_initial_progress(monkeypatch):
 
     assert events[0] == 'data: {"current": 0, "total": 1}'
     assert events[-1] == "data: [DONE]"
+
+
+def test_daily_themes_stream_missing_api_key(monkeypatch):
+    from main import app, STATE
+    from parse import Message
+    from fastapi.testclient import TestClient
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    STATE["messages"] = [
+        Message(ts=dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc), sender="A", text="hi")
+    ]
+    client = TestClient(app)
+    with client.stream("GET", "/daily_themes_stream") as r:
+        events = [line for line in r.iter_lines() if line]
+
+    assert events[0] == 'data: {"current": 0, "total": 0, "error": "OpenAI API key not set"}'
+    assert events[-1] == "data: [DONE]"
+
+
+def test_daily_themes_missing_api_key(monkeypatch):
+    from main import app, STATE
+    from parse import Message
+    from fastapi.testclient import TestClient
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    STATE["messages"] = [
+        Message(ts=dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc), sender="A", text="hi")
+    ]
+    client = TestClient(app)
+    res = client.get("/daily_themes")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["days"] == []
+    assert data["error"] == "OpenAI API key not set"

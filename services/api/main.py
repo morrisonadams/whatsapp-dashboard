@@ -85,7 +85,13 @@ async def get_daily_themes():
         raise HTTPException(status_code=404, detail="No upload yet")
     # Gracefully handle missing model credentials by returning an empty result
     if not os.getenv("OPENAI_API_KEY"):
-        return {"range_start": None, "range_end": None, "timezone": "UTC", "days": []}
+        return {
+            "range_start": None,
+            "range_end": None,
+            "timezone": "UTC",
+            "days": [],
+            "error": "OpenAI API key not set",
+        }
     try:
         daily = group_by_day(STATE["messages"], dt.timezone.utc)
         all_days: List[Dict[str, Any]] = []
@@ -114,10 +120,11 @@ async def daily_themes_stream():
     """Stream daily theme analysis progress for the uploaded chat."""
     if STATE["messages"] is None:
         raise HTTPException(status_code=404, detail="No upload yet")
-    # If no API key, immediately finish with no data
+    # If no API key, immediately finish with no data and an error message
     if not os.getenv("OPENAI_API_KEY"):
         async def empty_gen():
-            yield "data: {\"current\": 0, \"total\": 0}\n\n"
+            payload = {"current": 0, "total": 0, "error": "OpenAI API key not set"}
+            yield f"data: {json.dumps(payload)}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(empty_gen(), media_type="text/event-stream")
 
