@@ -15,3 +15,12 @@ def test_words_and_reply_distributions():
     assert k["words_per_message"]["Bob"] == [2, 1]
     assert sorted(k["reply_times"]["Bob"]) == [60.0, 180.0]
     assert sorted(k["reply_times"]["Alice"]) == [60.0]
+    assert k["words_per_message_timeline"] == [
+        {"day": "2024-01-01", "sender": "Alice", "words": 1},
+        {"day": "2024-01-01", "sender": "Bob", "words": 2},
+        {"day": "2024-01-01", "sender": "Alice", "words": 3},
+        {"day": "2024-01-01", "sender": "Bob", "words": 1},
+    ]
+    rtt = k["reply_times_timeline"]
+    assert sorted([r["seconds"] for r in rtt if r["sender"] == "Bob"]) == [60.0, 180.0]
+    assert sorted([r["seconds"] for r in rtt if r["sender"] == "Alice"]) == [60.0]
