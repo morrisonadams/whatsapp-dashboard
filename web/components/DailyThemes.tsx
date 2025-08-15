@@ -119,7 +119,11 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
             : undefined
         }
       >
-        <span className="text-[0.6rem] absolute top-1 left-1">{d}</span>
+        <span
+          className="text-xs font-bold absolute top-1 left-1 bg-white/80 text-black rounded px-1"
+        >
+          {d}
+        </span>
         {info && (
           <span className="flex-1 flex items-center justify-center text-xl">
             {info.dominant_theme?.icon}
@@ -131,8 +135,24 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
   while (cells.length % 7 !== 0) cells.push(<div key={`e${cells.length}`} />);
 
   return (
-    <Card title="Daily themes calendar" tooltip="Use left/right arrow keys to change month">
-      <div className="text-center mb-2 font-semibold">{monthLabel}</div>
+    <Card title="Daily themes calendar" tooltip="Use the arrows to change month">
+      <div className="flex items-center justify-center mb-2 font-semibold gap-2">
+        <button
+          onClick={() => changeMonth(-1)}
+          className="px-1 rounded hover:bg-white/10"
+          aria-label="Previous month"
+        >
+          ‹
+        </button>
+        <div className="flex-1 text-center">{monthLabel}</div>
+        <button
+          onClick={() => changeMonth(1)}
+          className="px-1 rounded hover:bg-white/10"
+          aria-label="Next month"
+        >
+          ›
+        </button>
+      </div>
       <div className="grid grid-cols-7 text-xs mb-1">
         {weekdayLabels.map((w) => (
           <div key={w} className="text-center">
