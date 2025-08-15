@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Card from "@/components/Card";
+import Chart from "@/components/Chart";
+import useThemePalette from "@/lib/useThemePalette";
 import { getDailyThemes } from "@/lib/api";
 
 interface DayTheme {
@@ -27,6 +29,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
   );
   const [loading, setLoading] = useState<boolean>(false);
   const [currentMonth, setCurrentMonth] = useState<Date | null>(null);
+  const palette = useThemePalette();
 
   useEffect(() => {
     if (!refreshKey) {
@@ -94,6 +97,34 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     );
   if (loading) return <div className="text-gray-300">Loading daily themes...</div>;
   if (!days.length) return <div className="text-gray-300">No daily themes yet.</div>;
+
+  const scoreHistOption = useMemo(() => ({
+    backgroundColor: "transparent",
+    textStyle: { color: palette.text },
+    tooltip: {
+      formatter: (p: any) => `${p.name}: ${p.value}`,
+    },
+    xAxis: {
+      type: "category",
+      data: days.map((d) => d.date),
+      axisLabel: { color: palette.text, rotate: 45 },
+      axisLine: { lineStyle: { color: palette.subtext } },
+    },
+    yAxis: {
+      type: "value",
+      name: "Score",
+      max: 100,
+      axisLabel: { color: palette.text },
+      axisLine: { lineStyle: { color: palette.subtext } },
+    },
+    series: [
+      {
+        type: "bar",
+        data: days.map((d) => d.mood_pct ?? 0),
+        itemStyle: { color: palette.series[0] },
+      },
+    ],
+  }), [days, palette]);
 
   const monthLabel = currentMonth?.toLocaleDateString(undefined, {
     year: "numeric",
@@ -164,6 +195,9 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
         ))}
       </div>
       <div className="grid grid-cols-7 gap-1">{cells}</div>
+      <div className="mt-4">
+        <Chart option={scoreHistOption} height={200} />
+      </div>
     </Card>
   );
 }
