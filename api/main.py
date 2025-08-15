@@ -5,7 +5,7 @@ from typing import Optional, List
 import os
 
 from services.api import parse
-from services.api.daily_themes import analyze_range
+from services.api.daily_themes import analyze_ranges
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any
@@ -100,17 +100,25 @@ async def daily_themes(
     if not daily:
         raise HTTPException(status_code=400, detail="No messages in range")
 
+    ranges = list(parse.iterate_14day_ranges(daily))
+    results = await analyze_ranges(ranges, tz)
+
     all_days: List[Dict[str, Any]] = []
     global_start: Optional[dt.date] = None
     global_end: Optional[dt.date] = None
 
-    for range_start, range_end, msgs_range in parse.iterate_14day_ranges(daily):
-        res = analyze_range(range_start, range_end, msgs_range, tz)
+    for res in results:
         all_days.extend(res.get("days", []))
-        if global_start is None or range_start < global_start:
-            global_start = range_start
-        if global_end is None or range_end > global_end:
-            global_end = range_end
+        rs = res.get("range_start")
+        re = res.get("range_end")
+        if rs:
+            rs_date = dt.date.fromisoformat(rs)
+            if global_start is None or rs_date < global_start:
+                global_start = rs_date
+        if re:
+            re_date = dt.date.fromisoformat(re)
+            if global_end is None or re_date > global_end:
+                global_end = re_date
 
     all_days.sort(key=lambda d: d.get("date", ""))
 

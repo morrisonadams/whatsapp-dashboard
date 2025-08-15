@@ -77,16 +77,16 @@ def test_daily_themes_stream_initial_progress(monkeypatch):
     from fastapi.testclient import TestClient
 
     monkeypatch.setenv("OPENAI_API_KEY", "test")
-    # Stub out analyze_range to avoid external calls
-    monkeypatch.setattr(
-        "main.analyze_range",
-        lambda *args, **kwargs: {
+    # Stub out stream_daily_themes to avoid external calls
+    async def fake_stream(*args, **kwargs):
+        yield 1, 1, {
             "range_start": "2024-01-01",
             "range_end": "2024-01-01",
             "timezone": "UTC",
             "days": [],
-        },
-    )
+        }
+
+    monkeypatch.setattr("main.stream_daily_themes", fake_stream)
 
     STATE["messages"] = [
         Message(ts=dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc), sender="A", text="hi")

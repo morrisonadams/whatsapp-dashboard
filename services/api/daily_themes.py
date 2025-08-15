@@ -1,15 +1,45 @@
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 import json
 import os
 import logging
-from typing import Any, Dict, List
+import hashlib
+from pathlib import Path
+import threading
+from typing import Any, Dict, List, AsyncIterator, Tuple, Optional
 
 from openai import OpenAI
 
 from parse import Message
 from themes import THEMES, mood_to_color
+
+
+CACHE_FILE = Path(__file__).with_name("daily_themes_cache.json")
+_CACHE: Dict[str, Any] = {}
+_CACHE_LOCK = threading.Lock()
+
+
+def _load_cache() -> None:
+    global _CACHE
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            _CACHE = json.load(f)
+    except FileNotFoundError:
+        _CACHE = {}
+
+
+def _save_cache() -> None:
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(_CACHE, f)
+
+
+_load_cache()
+
+DEFAULT_MAX_CONCURRENCY = max(
+    1, int(os.getenv("CONFLICT_MAX_CONCURRENCY", 0)) or (os.cpu_count() or 10)
+)
 
 
 class DailyThemesError(ValueError):
@@ -69,6 +99,11 @@ def analyze_range(
     start: dt.date, end: dt.date, msgs: List[Message], tz: dt.tzinfo
 ) -> Dict[str, Any]:
     transcript = _build_transcript(msgs, tz)
+    key_src = f"{start.isoformat()}|{end.isoformat()}|{tz}|{transcript}"
+    key = hashlib.sha256(key_src.encode("utf-8")).hexdigest()
+    with _CACHE_LOCK:
+        if key in _CACHE:
+            return _CACHE[key]
     date_range = f"{start.isoformat()} to {end.isoformat()}"
     prompt = PROMPT_TEMPLATE.format(
         date_range=date_range, transcript=transcript, timezone=str(tz)
@@ -84,19 +119,23 @@ def analyze_range(
             text={"format": {"type": "json_object"}},
         )
         content = (resp.output_text or "").strip()
-        return parse_days_json(content, start, end, tz)
+        data = parse_days_json(content, start, end, tz)
     except Exception as exc:
         # Gracefully fall back to an empty result if the model output cannot be
         # parsed or the API request fails. Log the exception and return the
         # error message so callers can surface it to users.
         logging.exception("Failed to analyze daily themes")
-        return {
+        data = {
             "range_start": start.isoformat(),
             "range_end": end.isoformat(),
             "timezone": str(tz),
             "days": [],
             "error": str(exc),
         }
+    with _CACHE_LOCK:
+        _CACHE[key] = data
+        _save_cache()
+    return data
 
 
 def parse_days_json(content: str, start: dt.date, end: dt.date, tz: dt.tzinfo) -> Dict[str, Any]:
@@ -168,3 +207,55 @@ def parse_days_json(content: str, start: dt.date, end: dt.date, tz: dt.tzinfo) -
         "timezone": str(tz),
         "days": days,
     }
+
+
+async def _analyze_range_async(
+    start: dt.date,
+    end: dt.date,
+    msgs: List[Message],
+    tz: dt.tzinfo,
+    sem: asyncio.Semaphore,
+) -> Dict[str, Any]:
+    async with sem:
+        return await asyncio.to_thread(analyze_range, start, end, msgs, tz)
+
+
+async def analyze_ranges(
+    ranges: List[Tuple[dt.date, dt.date, List[Message]]],
+    tz: dt.tzinfo,
+    max_concurrency: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY not set")
+    if max_concurrency is None:
+        max_concurrency = DEFAULT_MAX_CONCURRENCY
+    sem = asyncio.Semaphore(max_concurrency)
+    tasks = [
+        _analyze_range_async(start, end, msgs, tz, sem)
+        for start, end, msgs in ranges
+    ]
+    results = await asyncio.gather(*tasks)
+    results.sort(key=lambda r: r.get("range_start", ""))
+    return results
+
+
+async def stream_daily_themes(
+    ranges: List[Tuple[dt.date, dt.date, List[Message]]],
+    tz: dt.tzinfo,
+    max_concurrency: Optional[int] = None,
+) -> AsyncIterator[Tuple[int, int, Dict[str, Any]]]:
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY not set")
+    if max_concurrency is None:
+        max_concurrency = DEFAULT_MAX_CONCURRENCY
+    sem = asyncio.Semaphore(max_concurrency)
+    tasks = [
+        asyncio.create_task(_analyze_range_async(start, end, msgs, tz, sem))
+        for start, end, msgs in ranges
+    ]
+    total = len(tasks)
+    completed = 0
+    for fut in asyncio.as_completed(tasks):
+        result = await fut
+        completed += 1
+        yield completed, total, result
