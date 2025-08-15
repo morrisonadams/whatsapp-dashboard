@@ -117,6 +117,7 @@ async def daily_themes_stream():
     # If no API key, immediately finish with no data
     if not os.getenv("OPENAI_API_KEY"):
         async def empty_gen():
+            yield "data: {\"current\": 0, \"total\": 0}\n\n"
             yield "data: [DONE]\n\n"
         return StreamingResponse(empty_gen(), media_type="text/event-stream")
 
@@ -125,6 +126,8 @@ async def daily_themes_stream():
     total = len(ranges)
 
     async def event_gen():
+        # Emit initial progress so clients immediately see work starting
+        yield f"data: {json.dumps({'current': 0, 'total': total})}\n\n"
         for idx, (range_start, range_end, msgs) in enumerate(ranges, start=1):
             res = await asyncio.to_thread(
                 analyze_range, range_start, range_end, msgs, dt.timezone.utc
@@ -134,7 +137,6 @@ async def daily_themes_stream():
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_gen(), media_type="text/event-stream")
-
 
 @app.get("/conflicts", response_model=ConflictResponse)
 async def get_conflicts():

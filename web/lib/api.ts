@@ -49,7 +49,11 @@ export async function getConflicts(
       }
       try {
         const msg = JSON.parse(ev.data);
-        if (msg.current && msg.total && onProgress) {
+        if (
+          typeof msg.current === "number" &&
+          typeof msg.total === "number" &&
+          onProgress
+        ) {
           onProgress(msg.current, msg.total);
         }
         if (msg.period) periods.push(msg.period);
@@ -80,7 +84,11 @@ export async function getDailyThemes(
       }
       try {
         const msg = JSON.parse(ev.data);
-        if (msg.current && msg.total && onProgress) {
+        if (
+          typeof msg.current === "number" &&
+          typeof msg.total === "number" &&
+          onProgress
+        ) {
           onProgress(msg.current, msg.total);
         }
         if (msg.range && Array.isArray(msg.range.days)) {

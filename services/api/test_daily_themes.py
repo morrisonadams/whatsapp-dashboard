@@ -67,3 +67,31 @@ def test_analyze_range_returns_empty_on_bad_json(monkeypatch):
     msg = Message(ts=dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc), sender="A", text="hi")
     out = analyze_range(dt.date(2024, 1, 1), dt.date(2024, 1, 14), [msg], dt.timezone.utc)
     assert out["days"] == []
+
+
+def test_daily_themes_stream_initial_progress(monkeypatch):
+    from main import app, STATE
+    from parse import Message
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    # Stub out analyze_range to avoid external calls
+    monkeypatch.setattr(
+        "main.analyze_range",
+        lambda *args, **kwargs: {
+            "range_start": "2024-01-01",
+            "range_end": "2024-01-01",
+            "timezone": "UTC",
+            "days": [],
+        },
+    )
+
+    STATE["messages"] = [
+        Message(ts=dt.datetime(2024, 1, 1, tzinfo=dt.timezone.utc), sender="A", text="hi")
+    ]
+    client = TestClient(app)
+    with client.stream("GET", "/daily_themes_stream") as r:
+        events = [line for line in r.iter_lines() if line]
+
+    assert events[0] == 'data: {"current": 0, "total": 1}'
+    assert events[-1] == "data: [DONE]"
