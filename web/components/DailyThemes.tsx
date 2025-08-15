@@ -7,8 +7,7 @@ import { getDailyThemes } from "@/lib/api";
 interface DayTheme {
   date: string;
   description?: string;
-  mood?: number;
-  mood_pct?: number;
+  health_score?: number;
   color_hex: string;
   dominant_theme?: { id: number; name: string; icon: string };
 }
@@ -110,7 +109,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       },
       yAxis: {
         type: "value",
-        name: "Score",
+        name: "Health Score",
         max: 100,
         axisLabel: { color: palette.text },
         axisLine: { lineStyle: { color: palette.subtext } },
@@ -119,7 +118,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
         {
           type: "bar",
           data: days.map((d) => ({
-            value: d.mood_pct ?? 0,
+            value: d.health_score ?? 0,
             itemStyle: { color: d.color_hex || palette.series[0] },
           })),
         },
@@ -134,7 +133,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       const start = Math.max(0, i - 13);
       const slice = days
         .slice(start, i + 1)
-        .map((d) => d.mood_pct ?? 0);
+        .map((d) => d.health_score ?? 0);
       const avg =
         slice.reduce((sum, v) => sum + v, 0) / (slice.length || 1);
       values.push(parseFloat(avg.toFixed(2)));
@@ -158,7 +157,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       },
       yAxis: {
         type: "value",
-        name: "14d Avg",
+        name: "14d Avg Health Score",
         max: 100,
         axisLabel: { color: palette.text },
         axisLine: { lineStyle: { color: palette.subtext } },
@@ -215,7 +214,9 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
             className="flex-1 flex items-center justify-center text-xl"
             title={[
               info.description,
-              info.mood_pct !== undefined ? `Score: ${info.mood_pct}` : undefined,
+              info.health_score !== undefined
+                ? `Health Score: ${info.health_score}`
+                : undefined,
             ]
               .filter(Boolean)
               .join(" — ")}

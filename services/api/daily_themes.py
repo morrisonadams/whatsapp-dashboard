@@ -49,17 +49,17 @@ PROMPT_TEMPLATE = (
     "You are an assistant categorizing daily conversation themes.\n"
     "Given the chat transcript between {date_range} in timezone {timezone},\n"
     "analyze each day's messages, looking for playfulness and how positively the two are interacting.\n"
-    "Estimate the vibe of their relationship on a scale of 0-100.\n"
+    "Estimate the relationship health of the couple on a scale of 0-100.\n"
     "For each day, decide whether anything notable happened. Only use theme ids\n"
     "1 (emotional day), 2 (conflict day), or 3 (exciting day) when the messages\n"
     "clearly show a significant emotion, a definite conflict, or an exciting\n"
     "event. If there's any doubt, use 0 (normal day). The vast majority of days\n"
     "should be theme 0, with 1/2/3 reserved for truly obvious cases.\n"
     "Return a JSON object mapping each date (YYYY-MM-DD) to an object with:\n"
-    "  mood_pct: integer 0-100 representing overall vibe,\n"
+    "  health_score: integer 0-100 representing overall relationship health,\n"
     "  dominant_theme: object {{\"id\": <theme_id>}}, and\n"
     "  description: one or two sentences describing the day's notable events or mood.\n"
-    "Example: {{\"2024-01-01\": {{\"mood_pct\": 75, \"dominant_theme\": {{\"id\": 2}}, \"description\": \"argued about chores\"}}}}\n"
+    "Example: {{\"2024-01-01\": {{\"health_score\": 75, \"dominant_theme\": {{\"id\": 2}}, \"description\": \"argued about chores\"}}}}\n"
     "Transcript:\n{transcript}"
 )
 
@@ -175,14 +175,21 @@ def parse_days_json(content: str, start: dt.date, end: dt.date, tz: dt.tzinfo) -
         if not isinstance(info, dict):
             raise DailyThemesError(f"Day entry for {date_str} must be an object")
 
-        # Normalize mood color
-        mood_pct = (
-            info.get("mood_pct")
+        # Normalize health score and derive color
+        health_score = (
+            info.get("health_score")
+            or info.get("health_pct")
+            or info.get("health")
+            or info.get("mood_pct")
             or info.get("mood_percent")
             or info.get("mood")
             or 0
         )
-        info["color_hex"] = mood_to_color(int(mood_pct))
+        info["health_score"] = int(health_score)
+        info["color_hex"] = mood_to_color(int(health_score))
+        for legacy in ["mood_pct", "mood_percent", "mood", "health_pct", "health"]:
+            if legacy in info:
+                info.pop(legacy)
 
         # Normalize description/summary field
         description = info.get("description") or info.get("summary") or ""
