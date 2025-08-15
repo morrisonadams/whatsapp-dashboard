@@ -75,15 +75,23 @@ export async function getDailyThemes(
     const es = new EventSource(`${API_BASE}/daily_themes_stream`);
     const days: any[] = [];
 
-    const timeout = setTimeout(() => {
-      es.close();
-      console.error("Daily themes request timed out");
-w Error("Daily themes request timed out"));
-    }, 30000);
 
+    const startTimeout = () =>
+      setTimeout(() => {
+        es.close();
+        console.error("Daily themes request timed out");
+        reject(new Error("Daily themes request timed out"));
+      }, 30000);
+
+    let timeout = startTimeout();
+    const reset = () => {
+      clearTimeout(timeout);
+      timeout = startTimeout();
+    };
     const clear = () => clearTimeout(timeout);
 
     es.onmessage = (ev) => {
+      reset();
       if (ev.data === "[DONE]") {
         clear();
         es.close();
