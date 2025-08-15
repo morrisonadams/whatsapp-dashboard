@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Card from "@/components/Card";
 import { getDailyThemes } from "@/lib/api";
 
@@ -26,6 +26,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     null
   );
   const [loading, setLoading] = useState<boolean>(false);
+  const [currentMonth, setCurrentMonth] = useState<Date | null>(null);
 
   useEffect(() => {
     if (!refreshKey) {
@@ -39,6 +40,10 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     getDailyThemes((current, total) => setProgress({ current, total }))
       .then((d) => {
         setDays(d || []);
+        if ((d || []).length) {
+          const last = new Date((d as DayTheme[])[(d as DayTheme[]).length - 1].date);
+          setCurrentMonth(new Date(last.getFullYear(), last.getMonth(), 1));
+        }
         setProgress(null);
       })
       .catch((err) => {
@@ -59,19 +64,84 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
   if (loading) return <div className="text-gray-300">Loading daily themes...</div>;
   if (!days.length) return <div className="text-gray-300">No daily themes yet.</div>;
 
+  const monthDays = useMemo(() => {
+    if (!currentMonth) return new Map<number, DayTheme>();
+    const map = new Map<number, DayTheme>();
+    days.forEach((d) => {
+      const dt = new Date(d.date);
+      if (
+        dt.getFullYear() === currentMonth.getFullYear() &&
+        dt.getMonth() === currentMonth.getMonth()
+      ) {
+        map.set(dt.getDate(), d);
+      }
+    });
+    return map;
+  }, [days, currentMonth]);
+
+  const changeMonth = (delta: number) => {
+    setCurrentMonth((prev) => {
+      if (!prev) return prev;
+      return new Date(prev.getFullYear(), prev.getMonth() + delta, 1);
+    });
+  };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") changeMonth(-1);
+      else if (e.key === "ArrowRight") changeMonth(1);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const monthLabel = currentMonth?.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+  });
+  const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const startWeekday = currentMonth ? currentMonth.getDay() : 0; // 0=Sun
+  const daysInMonth = currentMonth
+    ? new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate()
+    : 0;
+  const cells: JSX.Element[] = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(<div key={`b${i}`} />);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const info = monthDays.get(d);
+    cells.push(
+      <div
+        key={d}
+        className="relative h-16 rounded-md flex flex-col bg-white/5"
+        style={info ? { backgroundColor: info.color_hex } : undefined}
+        title={
+          info
+            ? `${info.dominant_theme?.name || ""} ${(info.mood_pct ?? info.mood ?? 0).toString()}%\n${info.summary || ""}`
+            : undefined
+        }
+      >
+        <span className="text-[0.6rem] absolute top-1 left-1">{d}</span>
+        {info && (
+          <span className="flex-1 flex items-center justify-center text-xl">
+            {info.dominant_theme?.icon}
+          </span>
+        )}
+      </div>
+    );
+  }
+  while (cells.length % 7 !== 0) cells.push(<div key={`e${cells.length}`} />);
+
   return (
-    <div className="grid gap-4 md:grid-cols-2">
-      {days.map((day) => (
-        <Card key={day.date} title={day.date}>
-          <div className="flex items-center mb-2">
-            <span className="text-2xl mr-2">{day.dominant_theme?.icon}</span>
-            <span className="flex-1">{day.summary || day.dominant_theme?.name}</span>
-            <span>{(day.mood_pct ?? day.mood ?? 0).toString()}%</span>
+    <Card title="Daily themes calendar" tooltip="Use left/right arrow keys to change month">
+      <div className="text-center mb-2 font-semibold">{monthLabel}</div>
+      <div className="grid grid-cols-7 text-xs mb-1">
+        {weekdayLabels.map((w) => (
+          <div key={w} className="text-center">
+            {w}
           </div>
-          <div className="h-2 w-full rounded" style={{ backgroundColor: day.color_hex }} />
-        </Card>
-      ))}
-    </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">{cells}</div>
+    </Card>
   );
 }
 
