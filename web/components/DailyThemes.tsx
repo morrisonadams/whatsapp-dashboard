@@ -4,7 +4,7 @@ import { getDailyThemes } from "@/lib/api";
 
 interface DayTheme {
   date: string;
-  summary?: string;
+  description?: string;
   mood?: number;
   mood_pct?: number;
   color_hex: string;
@@ -113,11 +113,6 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
         key={d}
         className="relative h-16 rounded-md flex flex-col bg-white/5"
         style={info ? { backgroundColor: info.color_hex } : undefined}
-        title={
-          info
-            ? `${info.dominant_theme?.name || ""} ${(info.mood_pct ?? info.mood ?? 0).toString()}%\n${info.summary || ""}`
-            : undefined
-        }
       >
         <span
           className="text-xs font-bold absolute top-1 left-1 bg-white/80 text-black rounded px-1"
@@ -125,7 +120,10 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
           {d}
         </span>
         {info && (
-          <span className="flex-1 flex items-center justify-center text-xl">
+          <span
+            className="flex-1 flex items-center justify-center text-xl"
+            title={info.description || ""}
+          >
             {info.dominant_theme?.icon}
           </span>
         )}

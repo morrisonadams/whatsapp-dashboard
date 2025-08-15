@@ -20,11 +20,15 @@ PROMPT_TEMPLATE = (
     "Given the chat transcript between {date_range} in timezone {timezone},\n"
     "analyze each day's messages, looking for playfulness and how positively the two are interacting.\n"
     "Estimate the vibe of their relationship on a scale of 0-100.\n"
+    "For each day, decide whether anything notable happened. Only use theme ids\n"
+    "1 (emotional day), 2 (conflict day), or 3 (exciting day) if the messages\n"
+    "clearly show a significant emotion, a definite conflict, or an exciting\n"
+    "event. Otherwise use 0 (normal day). Most days should be normal days.\n"
     "Return a JSON object mapping each date (YYYY-MM-DD) to an object with:\n"
-    "  mood_pct: integer 0-100 representing overall vibe, and\n"
-    "  dominant_theme: object {{\"id\": <theme_id>}} where theme_id is one of:\n"
-    "    0 normal day, 1 emotional day, 2 conflict day, 3 exciting day.\n"
-    "Example: {{\"2024-01-01\": {{\"mood_pct\": 75, \"dominant_theme\": {{\"id\": 2}}}}}}\n"
+    "  mood_pct: integer 0-100 representing overall vibe,\n"
+    "  dominant_theme: object {{\"id\": <theme_id>}}, and\n"
+    "  description: brief description of the day's notable events or mood.\n"
+    "Example: {{\"2024-01-01\": {{\"mood_pct\": 75, \"dominant_theme\": {{\"id\": 2}}, \"description\": \"argued about chores\"}}}}\n"
     "Transcript:\n{transcript}"
 )
 
@@ -139,6 +143,12 @@ def parse_days_json(content: str, start: dt.date, end: dt.date, tz: dt.tzinfo) -
             or 0
         )
         info["color_hex"] = mood_to_color(int(mood_pct))
+
+        # Normalize description/summary field
+        description = info.get("description") or info.get("summary") or ""
+        info["description"] = description
+        if "summary" in info:
+            info.pop("summary")
 
         dom = info.get("dominant_theme")
         if isinstance(dom, dict):

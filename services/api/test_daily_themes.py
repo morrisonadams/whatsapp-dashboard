@@ -8,8 +8,8 @@ from themes import THEMES, mood_to_color
 valid_json = (
     """
     {
-      "2024-01-02": {"mood": 75, "color_hex": "#fff", "dominant_theme": {"id": 3}},
-      "2024-01-01": {"mood": 20, "color_hex": "#000", "dominant_theme": {"id": 0}}
+      "2024-01-02": {"mood": 75, "color_hex": "#fff", "description": "party", "dominant_theme": {"id": 3}},
+      "2024-01-01": {"mood": 20, "color_hex": "#000", "description": "quiet", "dominant_theme": {"id": 0}}
     }
     """.strip()
 )
@@ -28,6 +28,8 @@ def test_parse_days_json_normalizes_and_sorts():
     first, second = out["days"]
     assert first["color_hex"] == mood_to_color(20)
     assert second["color_hex"] == mood_to_color(75)
+    assert first["description"] == "quiet"
+    assert second["description"] == "party"
     assert first["dominant_theme"]["name"] == THEMES[0]["name"]
     assert second["dominant_theme"]["icon"] == THEMES[3]["icon"]
 
