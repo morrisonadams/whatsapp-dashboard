@@ -128,6 +128,54 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     [days, palette]
   );
 
+  const rollingAvgData = useMemo(() => {
+    const values: number[] = [];
+    for (let i = 0; i < days.length; i++) {
+      const start = Math.max(0, i - 13);
+      const slice = days
+        .slice(start, i + 1)
+        .map((d) => d.mood_pct ?? 0);
+      const avg =
+        slice.reduce((sum, v) => sum + v, 0) / (slice.length || 1);
+      values.push(parseFloat(avg.toFixed(2)));
+    }
+    return values;
+  }, [days]);
+
+  const rollingAvgOption = useMemo(
+    () => ({
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: {
+        trigger: "axis",
+        formatter: (p: any) => `${p[0].name}: ${p[0].value}`,
+      },
+      xAxis: {
+        type: "category",
+        data: days.map((d) => d.date),
+        axisLabel: { color: palette.text, rotate: 45 },
+        axisLine: { lineStyle: { color: palette.subtext } },
+      },
+      yAxis: {
+        type: "value",
+        name: "14d Avg",
+        max: 100,
+        axisLabel: { color: palette.text },
+        axisLine: { lineStyle: { color: palette.subtext } },
+      },
+      series: [
+        {
+          type: "line",
+          data: rollingAvgData,
+          smooth: true,
+          lineStyle: { color: palette.series[1] },
+          itemStyle: { color: palette.series[1] },
+        },
+      ],
+    }),
+    [days, palette, rollingAvgData]
+  );
+
   if (error) return <div className="text-red-400">{error}</div>;
   if (progress)
     return (
@@ -209,6 +257,9 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       <div className="grid grid-cols-7 gap-1">{cells}</div>
       <div className="mt-4">
         <Chart option={scoreHistOption} height={200} />
+      </div>
+      <div className="mt-4">
+        <Chart option={rollingAvgOption} height={200} />
       </div>
     </Card>
   );
