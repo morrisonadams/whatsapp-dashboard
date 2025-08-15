@@ -7,8 +7,8 @@ import KpiStrip from "@/components/KpiStrip";
 import useThemePalette from "@/lib/useThemePalette";
 import UnifiedTimeline from "@/components/UnifiedTimeline";
 import SenderShareAreaChart from "@/components/SenderShareAreaChart";
-import WordsPerMessageBoxplot from "@/components/WordsPerMessageBoxplot";
-import ReplyTimeDistribution from "@/components/ReplyTimeDistribution";
+import WordsPerMessageBar from "@/components/WordsPerMessageBar";
+import ReplyTimeBar from "@/components/ReplyTimeBar";
 import DailyRhythmHeatmap from "@/components/DailyRhythmHeatmap";
 import DailyThemes from "@/components/DailyThemes";
 import { DateRangeContext } from "@/lib/DateRangeContext";
@@ -269,8 +269,8 @@ async function fetchConflicts() {
           <section id="analytics" className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <div className="space-y-6">
               <SenderShareAreaChart messages={kpis?.timeline_messages || []} participants={participants} />
-              <WordsPerMessageBoxplot data={kpis?.words_per_message || {}} />
-              <ReplyTimeDistribution data={kpis?.reply_times || {}} />
+              <WordsPerMessageBar data={kpis?.words_per_message_timeline || []} />
+              <ReplyTimeBar data={kpis?.reply_times_timeline || []} />
               <DailyRhythmHeatmap data={kpis?.heatmap || []} participants={participants} />
             </div>
             <div className="space-y-6">

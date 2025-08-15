@@ -122,6 +122,8 @@ def reply_pairs(df: pd.DataFrame) -> pd.DataFrame:
                 "from": cur["sender"],
                 "to": nxt["sender"],
                 "sec": (nxt["ts"] - cur["ts"]).total_seconds(),
+                "from_ts": cur["ts"],
+                "to_ts": nxt["ts"],
             })
     return pd.DataFrame(pairs)
 
@@ -208,11 +210,26 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         for p in participants
     }
 
+    wpm_timeline_df = d.copy()
+    wpm_timeline_df["day"] = wpm_timeline_df["ts"].dt.strftime("%Y-%m-%d")
+    words_per_message_timeline = (
+        wpm_timeline_df[["day", "sender", "n_words"]]
+        .rename(columns={"n_words": "words"})
+        .to_dict(orient="records")
+    )
+
     # Reply stats (first message in each run versus next sender)
     rp = reply_pairs(d)
     reply_simple = []
     reply_times = {str(p): [] for p in participants}
+    reply_times_timeline = []
     if not rp.empty:
+        rp["day"] = rp["to_ts"].dt.strftime("%Y-%m-%d")
+        reply_times_timeline = (
+            rp[["day", "to", "sec"]]
+            .rename(columns={"to": "sender", "sec": "seconds"})
+            .to_dict(orient="records")
+        )
         for person, arr in rp.groupby("to")["sec"]:
             arr = arr.clip(lower=0)
             reply_times[str(person)] = arr.astype(float).tolist()
@@ -297,7 +314,9 @@ def compute(df: pd.DataFrame) -> Dict[str, Any]:
         "totals": totals,
         "reply_simple": reply_simple,
         "words_per_message": words_per_message,
+        "words_per_message_timeline": words_per_message_timeline,
         "reply_times": reply_times,
+        "reply_times_timeline": reply_times_timeline,
         "interruptions": interrupts.to_dict(orient="records"),
         "questions": {"total": questions_total, "unanswered_15m": unanswered_total},
         "questions_split": q_split,
