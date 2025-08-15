@@ -97,8 +97,11 @@ async def get_daily_themes():
         all_days: List[Dict[str, Any]] = []
         start: Optional[dt.date] = None
         end: Optional[dt.date] = None
+        error: Optional[str] = None
         for range_start, range_end, msgs in iterate_14day_ranges(daily):
             res = analyze_range(range_start, range_end, msgs, dt.timezone.utc)
+            if not error and res.get("error"):
+                error = res["error"]
             all_days.extend(res.get("days", []))
             if start is None or range_start < start:
                 start = range_start
@@ -110,6 +113,7 @@ async def get_daily_themes():
             "range_end": end.isoformat() if end else None,
             "timezone": "UTC",
             "days": all_days,
+            **({"error": error} if error else {}),
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
@@ -139,6 +143,10 @@ async def daily_themes_stream():
             res = await asyncio.to_thread(
                 analyze_range, range_start, range_end, msgs, dt.timezone.utc
             )
+            if res.get("error"):
+                payload = {"current": idx, "total": total, "error": res["error"]}
+                yield f"data: {json.dumps(payload)}\n\n"
+                break
             payload = {"current": idx, "total": total, "range": res}
             yield f"data: {json.dumps(payload)}\n\n"
         yield "data: [DONE]\n\n"

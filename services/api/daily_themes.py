@@ -3,6 +3,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import logging
 from typing import Any, Dict, List
 
 from openai import OpenAI
@@ -61,15 +62,17 @@ def analyze_range(
         )
         content = (resp.output_text or "").strip()
         return parse_days_json(content, start, end, tz)
-    except Exception:
+    except Exception as exc:
         # Gracefully fall back to an empty result if the model output cannot be
-        # parsed or the API request fails. This mirrors the robustness of the
-        # conflict analysis which never propagates errors to callers.
+        # parsed or the API request fails. Log the exception and return the
+        # error message so callers can surface it to users.
+        logging.exception("Failed to analyze daily themes")
         return {
             "range_start": start.isoformat(),
             "range_end": end.isoformat(),
             "timezone": str(tz),
             "days": [],
+            "error": str(exc),
         }
 
 
