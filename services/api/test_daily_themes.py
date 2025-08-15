@@ -8,8 +8,8 @@ from themes import THEMES, mood_to_color
 valid_json = (
     """
     {
-      "2024-01-02": {"mood": 75, "color_hex": "#fff", "description": "party", "dominant_theme": {"id": 3}},
-      "2024-01-01": {"mood": 20, "color_hex": "#000", "description": "quiet", "dominant_theme": {"id": 0}}
+      "2024-01-02": {"health_score": 75, "color_hex": "#fff", "description": "party", "dominant_theme": {"id": 3}},
+      "2024-01-01": {"health_score": 20, "color_hex": "#000", "description": "quiet", "dominant_theme": {"id": 0}}
     }
     """.strip()
 )
@@ -28,6 +28,8 @@ def test_parse_days_json_normalizes_and_sorts():
     first, second = out["days"]
     assert first["color_hex"] == mood_to_color(20)
     assert second["color_hex"] == mood_to_color(75)
+    assert first["health_score"] == 20
+    assert second["health_score"] == 75
     assert first["description"] == "quiet"
     assert second["description"] == "party"
     assert first["dominant_theme"]["name"] == THEMES[0]["name"]
@@ -40,7 +42,7 @@ def test_parse_days_json_bad_json_raises():
 
 
 def test_parse_days_json_unknown_theme():
-    bad_theme_json = '{"2024-01-01": {"mood": 10, "dominant_theme": {"id": 99}}}'
+    bad_theme_json = '{"2024-01-01": {"health_score": 10, "dominant_theme": {"id": 99}}}'
     with pytest.raises(DailyThemesError):
         parse_days_json(bad_theme_json, dt.date(2024, 1, 1), dt.date(2024, 1, 1), dt.timezone.utc)
 
