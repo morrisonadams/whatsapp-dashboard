@@ -4,6 +4,11 @@ import Chart from "@/components/Chart";
 import useThemePalette from "@/lib/useThemePalette";
 import { getDailyThemes } from "@/lib/api";
 
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 interface DayTheme {
   date: string;
   description?: string;
@@ -44,7 +49,9 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
       .then((d) => {
         setDays(d || []);
         if ((d || []).length) {
-          const last = new Date((d as DayTheme[])[(d as DayTheme[]).length - 1].date);
+          const last = parseLocalDate(
+            (d as DayTheme[])[(d as DayTheme[]).length - 1].date,
+          );
           setCurrentMonth(new Date(last.getFullYear(), last.getMonth(), 1));
         }
         setProgress(null);
@@ -61,7 +68,7 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     if (!currentMonth) return new Map<number, DayTheme>();
     const map = new Map<number, DayTheme>();
     days.forEach((d) => {
-      const dt = new Date(d.date);
+      const dt = parseLocalDate(d.date);
       if (
         dt.getFullYear() === currentMonth.getFullYear() &&
         dt.getMonth() === currentMonth.getMonth()
