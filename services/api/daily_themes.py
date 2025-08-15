@@ -30,6 +30,24 @@ PROMPT_TEMPLATE = (
 
 
 def _build_transcript(msgs: List[Message], tz: dt.tzinfo) -> str:
+    """Return chat transcript lines matching the conflict analyzer format.
+
+    The conflict analysis pipeline sends the model a minimal transcript where
+    each line contains only the message date and text (e.g. ``"2024-01-01:
+    hello"``).  Previously, daily theme analysis included the full timestamp
+    and speaker label which produced significantly longer prompts and could
+    exceed the model's context window for busy chats.  To keep inputs identical
+    between the two analyses—and thus bounded in size—we mirror the conflict
+    input format here.
+
+    Parameters
+    ----------
+    msgs:
+        Messages to include in the transcript.
+    tz:
+        Timezone to normalize timestamps before extracting the date.
+    """
+
     lines: List[str] = []
     for m in sorted(msgs, key=lambda x: x.ts):
         ts = m.ts
@@ -38,9 +56,8 @@ def _build_transcript(msgs: List[Message], tz: dt.tzinfo) -> str:
                 ts = ts.replace(tzinfo=tz)
             else:
                 ts = ts.astimezone(tz)
-        speaker = m.sender or "system"
         text = m.text or ""
-        lines.append(f"{ts.isoformat()} - {speaker}: {text}")
+        lines.append(f"{ts:%Y-%m-%d}: {text}")
     return "\n".join(lines)
 
 
