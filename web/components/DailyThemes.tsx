@@ -88,6 +88,37 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
+  const scoreHistOption = useMemo(
+    () => ({
+      backgroundColor: "transparent",
+      textStyle: { color: palette.text },
+      tooltip: {
+        formatter: (p: any) => `${p.name}: ${p.value}`,
+      },
+      xAxis: {
+        type: "category",
+        data: days.map((d) => d.date),
+        axisLabel: { color: palette.text, rotate: 45 },
+        axisLine: { lineStyle: { color: palette.subtext } },
+      },
+      yAxis: {
+        type: "value",
+        name: "Score",
+        max: 100,
+        axisLabel: { color: palette.text },
+        axisLine: { lineStyle: { color: palette.subtext } },
+      },
+      series: [
+        {
+          type: "bar",
+          data: days.map((d) => d.mood_pct ?? 0),
+          itemStyle: { color: palette.series[0] },
+        },
+      ],
+    }),
+    [days, palette]
+  );
+
   if (error) return <div className="text-red-400">{error}</div>;
   if (progress)
     return (
@@ -97,34 +128,6 @@ export default function DailyThemes({ refreshKey }: DailyThemesProps) {
     );
   if (loading) return <div className="text-gray-300">Loading daily themes...</div>;
   if (!days.length) return <div className="text-gray-300">No daily themes yet.</div>;
-
-  const scoreHistOption = useMemo(() => ({
-    backgroundColor: "transparent",
-    textStyle: { color: palette.text },
-    tooltip: {
-      formatter: (p: any) => `${p.name}: ${p.value}`,
-    },
-    xAxis: {
-      type: "category",
-      data: days.map((d) => d.date),
-      axisLabel: { color: palette.text, rotate: 45 },
-      axisLine: { lineStyle: { color: palette.subtext } },
-    },
-    yAxis: {
-      type: "value",
-      name: "Score",
-      max: 100,
-      axisLabel: { color: palette.text },
-      axisLine: { lineStyle: { color: palette.subtext } },
-    },
-    series: [
-      {
-        type: "bar",
-        data: days.map((d) => d.mood_pct ?? 0),
-        itemStyle: { color: palette.series[0] },
-      },
-    ],
-  }), [days, palette]);
 
   const monthLabel = currentMonth?.toLocaleDateString(undefined, {
     year: "numeric",
